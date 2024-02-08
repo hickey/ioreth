@@ -90,11 +90,26 @@ The group chat/CQ log is at <https://aprsph.net/cq>.
 - **VERSION** returns the python version.
 - **HELP** returns a list of commands.
 - Commands to run server-side commands are also supported.
+- 
+# Changelog
+
+- 2023-01-28: Added the ?APRSM feature, which lets users retrieve their last 5 messages from aprs.fi.
+- 2023-02-02: Improved handling of longer messages in relay and retrieval (pagination into 2 messages so it is not truncated)
+- 2023-03-26: Page now refreshes every 10 minutes. APRSPH also automatically advises all checked in stations that the net is about to restart.
+- 2023-03-29: Improved reply for CQ and NET messages to include timestamp to better handle clients that ignore duplicate messages (because our messages don't have msgID).
+- 2023-04-04: Added UNSUBSCRIBE command.
+- 2023-04-12: Added queries for retrieving #APRSThursday entries. Also improved the MINE, SEARCH commands to cover current month plus archives.
+- 2023-04-16: Throttled self ?APRSM to 1 query per 5 minutes, since a duplicate query will result in a different response set every time because the responses will now be the last messages received. Update: Changed to 30 minutes, as of 2023-05-04.
+- 2023-06-05: Minor fix to the SMSALIAS code to accommodate for extra spaces which results in no match.
+- 2023-06-30: Fixes to the back-end code to deal with looping messages and garbage characters from igates that cause looping.
+- 2023-07-04: Added support for ?APRSP and ?APRSS commands.
+- 2023-09-04: Edits to replace brackets to avoid HTML tags in log
+- 2024-01-11: Changed relay mechanism to include original callsign and SSID as the sender instead of APRSPH. Started to support direct logging of APRSThursday net without ANSRVR relay.
 
 More updated commands and instructions at https://aprsph.net.
 
 # Contact information
-- **Email**: qsl@n2rac.com
+- **Email**: info@aprsph.net
 - **Telegram**: jangelor
-- **Web**: <https://n2rac.com>
+- **Web**: <https://aprsph.net>
 - **APRS**: DU2XXR-7
