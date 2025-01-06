@@ -23,7 +23,7 @@
 # as well as a means to forward messages to all stations checked in for the day
 # It is also supported by local cron jobs on my own machine and web server
 # to publish the net log on a regular basis.
-# 
+#
 # Pardon my code. My knowledge is very rudimentary, and I only modify or create
 # functions as I need them. If anyone can help improve on the code and the
 # logic of this script, I would very much appreciate it.
@@ -52,7 +52,7 @@ from datetime import datetime
 import calendar
 
 logging.basicConfig()
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('iorethd.bot')
 
 from cronex import CronExpression
 from .clients import AprsClient

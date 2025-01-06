@@ -22,7 +22,7 @@ import subprocess
 
 
 logging.basicConfig()
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('iorethd.utils')
 
 
 def simple_ping(host, timeout=15):

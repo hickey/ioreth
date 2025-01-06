@@ -16,6 +16,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+import logging
+
+logging.basicConfig()
+logger = logging.getLogger('iorethd.ax25')
+
 """
 Random utilities for handling AX25 frames
 """
@@ -173,7 +178,8 @@ def unpack_path_to_addrs(path):
 
 
 class Frame:
-    def __init__(self, source, dest, path, control, pid, info):
+    def __init__(self, source, dest, path, control, pid, info, via=None):
+        logger.info(f"__init__({source}, {dest}, {path}, {control}, {pid}, {info}, {via})")
         self.source = source
         self.dest = dest
         self.path = path

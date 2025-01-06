@@ -21,19 +21,34 @@
 
 import sys
 import logging
+import argparse
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)-15s %(levelname)s: %(funcName)s %(message)s"
+    level=logging.INFO, format="%(asctime)-15s %(levelname)s: %(name)s::%(funcName)s %(message)s"
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('iorethd')
 
 from ioreth.bot import ReplyBot
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: %s <config-file.conf>" % (sys.argv[0]))
-        exit(1)
-    b = ReplyBot(sys.argv[1])
-    b.connect()
-    b.loop()
+
+    parser = argparse.ArgumentParser(
+                    prog='iorethd',
+                    description='Experimental APRS bot',
+                    epilog='')
+    parser.add_argument('-d', '--debug', action='store_true',
+                        help='Set debug logging')
+    parser.add_argument('-c', '--config', type=str, default='/etc/aprsbot.conf',
+                        help='Use config file')
+
+    args = parser.parse_args()
+
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        for l in logger.getChildren():
+            l.setLevel(logging.DEBUG)
+        logger.debug('Debug logging enabled')
+
+    b = ReplyBot(args.config)
+    b.start()

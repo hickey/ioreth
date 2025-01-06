@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 from . import ax25
 
+logging.basicConfig()
+logger = logging.getLogger('iorethd.clients')
 
 class TcpKissClient:
     FEND = b"\xc0"
