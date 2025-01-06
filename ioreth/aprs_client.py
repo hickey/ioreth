@@ -16,27 +16,76 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+import time
 import logging
 
+from .ax25 import Frame
+
 logging.basicConfig()
-logger = logging.getLogger(__name__)
-
-from . import ax25
+logger = logging.getLogger('iorethd.clients')
 
 
-class Handler:
+class AprsClient:
     """Handle parsing and generation of APRS packets.
     """
 
     DEFAULT_PATH = "WIDE1-1,WIDE2-2"
     DEFAULT_DESTINATION = "APZIOR"
 
-    def __init__(self, callsign="XX0ABC"):
+    def __init__(self, callsign="XX0ABC",
+                 destination=DEFAULT_DESTINATION,
+                 path=DEFAULT_PATH):
         self.callsign = callsign
-        self.destination = Handler.DEFAULT_DESTINATION
-        self.path = Handler.DEFAULT_PATH
+        self.destination = destination
+        self.path = path
 
-    def make_frame(self, data):
+        self._snd_queue = []
+        self._snd_queue_interval = 2
+        self._snd_queue_last = time.monotonic()
+        self._frame_cnt = 0
+
+    def send_frame_bytes(self, frame_bytes):
+        try:
+            logger.info("SEND: %s", frame_bytes.hex())
+            self.write_frame(frame_bytes)
+        except Exception as exc:
+            logger.warning(exc)
+
+    def on_recv(self, frame_bytes):
+        # try:
+            frame = Frame.from_kiss_bytes(frame_bytes)
+            logger.info("RECV: %s", str(frame))
+            # TODO update how to move frame
+            self.handle_frame(frame)
+        #except Exception as exc:
+        #    logger.warning(exc)
+
+
+    def enqueue_frame(self, frame):
+        logger.info("AX.25 frame %d: %s", self._frame_cnt, frame.to_aprs_string())
+        #self.enqueue_frame_bytes(frame.to_kiss_bytes())
+        self.enqueue_frame_bytes(frame.to_aprs_string())
+
+    def enqueue_frame_bytes(self, data_bytes):
+        logger.info("AX.25 frame %d enqueued for sending", self._frame_cnt)
+        self._snd_queue.append((self._frame_cnt, data_bytes))
+        self._frame_cnt += 1
+
+    def dequeue_frame_bytes(self):
+        now = time.monotonic()
+        if now < (self._snd_queue_last + self._snd_queue_interval):
+            return
+        self._snd_queue_last = now
+        if len(self._snd_queue) > 0:
+            num, frame_bytes = self._snd_queue.pop(0)
+            logger.info("Sending queued AX.25 frame %d", num)
+            logger.info(frame_bytes)
+            self.send_frame_bytes(frame_bytes)
+
+    def on_loop_hook(self):
+        self.dequeue_frame_bytes()
+
+    def make_frame(self, data, via=None):
         """Shortcut for making a AX.25 frame with a APRS packet with the
         known (mostly constant) information and 'data' as the contents.
         """
@@ -47,18 +96,20 @@ class Handler:
             ax25.APRS_CONTROL_FLD,
             ax25.APRS_PROTOCOL_ID,
             data,
+            via,
         )
 
-    def make_aprs_msg(self, to_call, text):
+    def make_aprs_msg(self, to_call, text, via=None):
         """Make an APRS message packet sending 'text' to 'to_call'.
         """
         addr_msg = ":" + to_call.ljust(9, " ") + ":" + text
-        return self.make_frame(addr_msg.encode("utf-8"))
+        return self.make_frame(addr_msg.encode("utf-8"), via)
 
-    def make_aprs_status(self, status):
+    def make_aprs_status(self, status, via=None):
         """Make an APRS status packet.
         """
-        return self.make_frame((">" + status).encode("utf-8"))
+        return self.make_frame((">" + status).encode("utf-8"), via)
+
 
     def handle_frame(self, frame):
         """ Handle an AX.25 frame and looks for APRS data packets.
@@ -131,7 +182,7 @@ class Handler:
             return
         data_type = payload[0]
         if data_type == ord(b":"):
-            self._handle_aprs_message(origframe, source, payload, via)
+            self.on_aprs_message(origframe, source, payload, via)
         elif data_type == ord(b">"):
             self.on_aprs_status(origframe, source, payload, via)
         elif data_type == ord(b";"):
@@ -165,7 +216,7 @@ class Handler:
         """
         pass
 
-    def _handle_aprs_message(self, origframe, source, payload, via):
+    def on_aprs_message(self, origframe, source, payload, via=None):
         """Parse APRS message packet (data type: :)
 
         This may be a directed message, a bulletin, announce ... with or
@@ -186,13 +237,9 @@ class Handler:
             # This message is asking for an ack.
             msgid = text_msgid[1]
 
-        logger.info("Message from %s: %s", source, text)
-        self.on_aprs_message(source, addressee, text, origframe, msgid, via)
-
-    def on_aprs_message(self, source, addressee, text, origframe, msgid=None, via=None):
-        """APRS message packet (data type: :)
-        """
-        pass
+        logger.info(f"Message from {source}:{text}")
+        # TODO where to send the message from here? To the handler (i.e. bot)?
+        # self.on_aprs_message(source, addressee, text, origframe, msgid, via)
 
     def on_aprs_status(self, origframe, source, payload, via=None):
         """APRS status packet (data type: >)
