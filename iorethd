@@ -51,4 +51,5 @@ if __name__ == "__main__":
         logger.debug('Debug logging enabled')
 
     b = ReplyBot(args.config)
+    b.connect()
     b.start()

@@ -19,10 +19,10 @@
 import time
 import logging
 
-from .ax25 import Frame
+from .ax25 import Frame, Address, APRS_CONTROL_FLD, APRS_PROTOCOL_ID
 
 logging.basicConfig()
-logger = logging.getLogger('iorethd.clients')
+logger = logging.getLogger('iorethd.aprs_client')
 
 
 class AprsClient:
@@ -32,13 +32,7 @@ class AprsClient:
     DEFAULT_PATH = "WIDE1-1,WIDE2-2"
     DEFAULT_DESTINATION = "APZIOR"
 
-    def __init__(self, callsign="XX0ABC",
-                 destination=DEFAULT_DESTINATION,
-                 path=DEFAULT_PATH):
-        self.callsign = callsign
-        self.destination = destination
-        self.path = path
-
+    def __init__(self):
         self._snd_queue = []
         self._snd_queue_interval = 2
         self._snd_queue_last = time.monotonic()
@@ -52,14 +46,14 @@ class AprsClient:
             logger.warning(exc)
 
     def on_recv(self, frame_bytes):
+        logger.debug(f'({frame_bytes})')
         # try:
-            frame = Frame.from_kiss_bytes(frame_bytes)
-            logger.info("RECV: %s", str(frame))
-            # TODO update how to move frame
-            self.handle_frame(frame)
-        #except Exception as exc:
-        #    logger.warning(exc)
-
+        frame = Frame.from_kiss_bytes(frame_bytes)
+        logger.info("RECV: %s", str(frame))
+        # TODO update how to move frame
+        self.handle_frame(frame)
+        # except Exception as exc:
+            # logger.warning(exc)
 
     def enqueue_frame(self, frame):
         logger.info("AX.25 frame %d: %s", self._frame_cnt, frame.to_aprs_string())
@@ -89,12 +83,12 @@ class AprsClient:
         """Shortcut for making a AX.25 frame with a APRS packet with the
         known (mostly constant) information and 'data' as the contents.
         """
-        return ax25.Frame(
-            ax25.Address.from_string(self.callsign),
-            ax25.Address.from_string(self.destination),
-            [ax25.Address.from_string(s) for s in self.path.split(",")],
-            ax25.APRS_CONTROL_FLD,
-            ax25.APRS_PROTOCOL_ID,
+        return Frame(
+            Address.from_string(self.callsign),
+            Address.from_string(self.destination),
+            [Address.from_string(s) for s in self.path.split(",")],
+            APRS_CONTROL_FLD,
+            APRS_PROTOCOL_ID,
             data,
             via,
         )
@@ -114,6 +108,7 @@ class AprsClient:
     def handle_frame(self, frame):
         """ Handle an AX.25 frame and looks for APRS data packets.
         """
+        logger.debug(f'({frame=})')
 
         if frame.info == b"":
             # No data.
@@ -163,6 +158,14 @@ class AprsClient:
 
         self.on_aprs_packet(frame, source, payload, via)
 
+    def send_aprs_msg(self, to_call, text, via=None):
+        logger.debug(f"({to_call}, {text}, {via})")
+        self.write_frame(self.make_aprs_msg(to_call, text, via=via))
+
+    def send_aprs_status(self, status, via=None):
+        logger.debug(f"({status}, {via})")
+        self.write_frame(self.make_aprs_status(status, via=via))
+
     def on_aprs_packet(self, origframe, source, payload, via=None):
         """A APRS packet was received, possibly through a third-party forward.
 
@@ -177,6 +180,8 @@ class AprsClient:
         via: None is not a third party packet; otherwise is the callsign of
              the forwarder (as a string).
         """
+        logger.debug(f'({origframe=}, {source=}, {payload=}, {via=})')
+
         if payload == b"":
             self.on_aprs_empty(origframe, source, payload, via)
             return
@@ -214,6 +219,7 @@ class AprsClient:
         """APRS empty packet (no payload). What can we do with this?! Just
         log the sending station as alive?
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_message(self, origframe, source, payload, via=None):
@@ -223,6 +229,8 @@ class AprsClient:
         without confirmation request, or maybe just trash. We will need to
         look inside to know.
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+
         data_str = payload.decode("utf-8", errors="replace")
 
         addressee_text = data_str[1:].split(":", 1)
@@ -237,33 +245,48 @@ class AprsClient:
             # This message is asking for an ack.
             msgid = text_msgid[1]
 
+            logger.info(f"Sending ack to message {msgid} from {source=}.")
+            self.send_aprs_msg(source.replace('*',''), "ack" + msgid, via)
+
         logger.info(f"Message from {source}:{text}")
-        # TODO where to send the message from here? To the handler (i.e. bot)?
-        # self.on_aprs_message(source, addressee, text, origframe, msgid, via)
+        response = self.handler.on_message(source, addressee, text)
+        logger.debug(f"{response=}")
+
+        # response is allowed to come back as multiple messages
+        if type(response) == list:
+            for r in response:
+                self.send_aprs_msg(source, r, via)
+        else:
+            self.send_aprs_msg(source, response, via)
 
     def on_aprs_status(self, origframe, source, payload, via=None):
         """APRS status packet (data type: >)
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_object(self, origframe, source, payload, via=None):
         """Object packet (data type: ;)
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_item(self, origframe, source, payload, via=None):
         """Object packet (data type: ))
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_query(self, origframe, source, payload, via=None):
         """APRS query packet (data type: ?)
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_capabilities(self, origframe, source, payload, via=None):
         """Station capabilities packet (data type: <)
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_position_wtr(self, origframe, source, payload, via=None):
@@ -277,6 +300,7 @@ class AprsClient:
         PP5JR-15>APNU3B,WIDE1-1,WIDE3-3:!2741.46S/04908.89W#PHG7460/REDE SUL APRS BOA VISTA RANCHO QUEIMADO SC
         PY5CTV-13>APTT4,PP5BAU-15*,PP5JRS-15*:! Weather Station ISS Davis Morro do Caratuva - PR
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_position_ts_msg(self, origframe, source, payload, via=None):
@@ -285,6 +309,7 @@ class AprsClient:
         eg.
         PP5JR-13>APRS,PP5JR-15*,PP5JRS-15*:@092248z2741.47S/04908.88W_098/011g014t057r000p000P000h60b07816.DsVP
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_position_msg(self, origframe, source, payload, via=None):
@@ -293,29 +318,35 @@ class AprsClient:
         eg.
         PY5TJ-12>APBK,PY5CTV-13*,WIDE1*,PP5JRS-15*:=2532.12S/04914.18WkTelemetria: 14.6v 25*C 56% U. Rel
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_position_ts(self, origframe, source, payload, via=None):
         """Position with timestamp, no APRS messaging (data type: /)
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_telemetry(self, origframe, source, payload, via=None):
         """Telemetry packet (data type: T)
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_mic_e(self, origframe, source, payload, via=None):
         """APRS Mic-E packet, current (data type: `)
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_old_mic_e(self, origframe, source, payload, via=None):
         """APRS Mic-E packet, old (data type: ')
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass
 
     def on_aprs_others(self, origframe, source, payload, via=None):
         """All other APRS data types (possibly unknown)
         """
+        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
         pass

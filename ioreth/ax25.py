@@ -186,6 +186,7 @@ class Frame:
         self.control = control
         self.pid = pid
         self.info = info
+        self.via = via
 
     @staticmethod
     def from_kiss_bytes(fdata):
@@ -233,8 +234,12 @@ class Frame:
 
     def to_kiss_bytes(self):
         self._update_end_of_path_flags()
+        via = ''
+        if self.via:
+            via = f"{self.via}>{self.via}:}}"
         return (
-            self.dest.to_bytes()
+            bytes(via, 'utf-8')
+            + self.dest.to_bytes()
             + self.source.to_bytes()
             + b"".join(p.to_bytes() for p in self.path)
             + bytes([self.control, self.pid])
@@ -281,8 +286,13 @@ class Frame:
         share of the messages being ASCII-only.
         """
 
+        via = ''
+        if self.via:
+            via = f"{self.via}>{self.via}:}}"
+
         buf = (
-            self.source.to_string().encode("ASCII")
+            via.encode("ASCII")
+            +self.source.to_string().encode("ASCII")
             + b">"
             + self.dest.to_string().encode("ASCII")
         )
