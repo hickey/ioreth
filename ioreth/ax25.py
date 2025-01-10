@@ -179,7 +179,7 @@ def unpack_path_to_addrs(path):
 
 class Frame:
     def __init__(self, source, dest, path, control, pid, info, via=None):
-        logger.info(f"__init__({source}, {dest}, {path}, {control}, {pid}, {info}, {via})")
+        logger.debug(f"({source}, {dest}, {path}, {control}, {pid}, {info}, {via})")
         self.source = source
         self.dest = dest
         self.path = path
@@ -250,7 +250,6 @@ class Frame:
     def from_aprs_string(frame_str):
         """frame_str is a *bytes* object!  Rename this.
         """
-
         # PP5ITT-7>APDR15,PP5JRS-15*,WIDE2-2,qAR,PU5BRA-10:=2628.97S/04906.81Wx Ittner
 
         # Split the frame in headers and data
@@ -277,6 +276,7 @@ class Frame:
 
         f = Frame(source, dest, path, APRS_CONTROL_FLD, APRS_PROTOCOL_ID, info)
         f._update_end_of_path_flags()
+        logger.debug(f'{f=}')
         return f
 
     def to_aprs_string(self):
@@ -303,4 +303,4 @@ class Frame:
         return buf
 
     def __repr__(self):
-        return self.to_aprs_string().decode("utf-8", errors="replace")
+        return f"<Frame={self.to_aprs_string().decode("utf-8", errors="replace")}>"

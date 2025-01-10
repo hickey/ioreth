@@ -33,10 +33,18 @@ class AprsClient:
     DEFAULT_DESTINATION = "APZIOR"
 
     def __init__(self):
-        self._snd_queue = []
-        self._snd_queue_interval = 2
-        self._snd_queue_last = time.monotonic()
-        self._frame_cnt = 0
+        self.path = None
+        self.destination = None
+        self.handler = None
+
+    def setDestination(self, dest: str):
+        self.destination = dest
+
+    def setPath(self, path: str):
+        self.path = path
+
+    def setHandler(self, handler):
+        self.handler = handler
 
     def send_frame_bytes(self, frame_bytes):
         try:
@@ -45,15 +53,11 @@ class AprsClient:
         except Exception as exc:
             logger.warning(exc)
 
-    def on_recv(self, frame_bytes):
-        logger.debug(f'({frame_bytes})')
-        # try:
-        frame = Frame.from_kiss_bytes(frame_bytes)
-        logger.info("RECV: %s", str(frame))
+    def on_recv_frame(self, frame):
+        logger.debug(f'({frame=})')
+
         # TODO update how to move frame
         self.handle_frame(frame)
-        # except Exception as exc:
-            # logger.warning(exc)
 
     def enqueue_frame(self, frame):
         logger.info("AX.25 frame %d: %s", self._frame_cnt, frame.to_aprs_string())

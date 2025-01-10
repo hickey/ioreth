@@ -22,6 +22,7 @@ import time
 import logging
 
 from .aprs_client import AprsClient
+from .ax25 import Frame
 
 logging.basicConfig()
 logger = logging.getLogger('iorethd.tcp_kiss_client')
@@ -36,6 +37,9 @@ class TcpKissClient(AprsClient):
     FESC_TFEND = FESC + TFEND
 
     def __init__(self, addr="localhost", port=8001):
+        logger.debug(f'({addr=}, {port=})')
+
+        AprsClient.__init__(self)
         self.addr = addr
         self.port = int(port)
         self._sock = None
@@ -68,14 +72,11 @@ class TcpKissClient(AprsClient):
     def setCallsign(self, callsign: str):
         self.callsign = callsign
 
-    def setDestination(self, dest: str):
-        self.destination = dest
+    def on_recv(self, frame_bytes):
+        logger.debug(f'({frame_bytes})')
 
-    def setPath(self, path: str):
-        self.path = path
-
-    def setHandler(self, handler):
-        self.handler = handler
+        frame = Frame.from_kiss_bytes(frame_bytes)
+        self.on_recv_frame(frame)
 
     def on_loop_hook(self):
         logger.debug('()')
@@ -150,6 +151,11 @@ class TcpKissClient(AprsClient):
     def write_frame(self, frame):
         """Send a complete frame."""
         logger.debug(f"({frame=})")
+
+        if type(frame) != Frame:
+            logger.error(f"{frame=} is not a ax25.Frame object. Ignoring frame.")
+            return
+
         if not self.is_connected():
             return
         frame_bytes = frame.to_kiss_bytes()
