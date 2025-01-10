@@ -20,7 +20,6 @@
 import logging
 import subprocess
 
-
 logging.basicConfig()
 logger = logging.getLogger('iorethd.utils')
 

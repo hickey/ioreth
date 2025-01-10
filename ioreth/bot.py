@@ -488,5 +488,5 @@ class ReplyBot:
 
         if cmd in self._extra_commands:
             mod = self._extra_commands[cmd]
-            return mod.invoke(frame)
+            return mod.invoke(frame, args)
 
