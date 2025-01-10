@@ -49,73 +49,12 @@ logging.basicConfig()
 logger = logging.getLogger('iorethd.bot')
 
 from cronex import CronExpression
-from .aprs_client import AprsClient
 from .tcp_kiss_client import TcpKissClient
 from .aprs_is_client import AprsIsClient
 from . import remotecmd
 from . import utils
-from .log import BotLog
-from os import path
-from urllib.request import urlopen, Request
 from glob import glob
 from importlib import import_module
-
-
-# These lines below I have added in order to provide a means for ioreth to store
-# and retrieve a list of "net" checkins on a daily basis. I did not bother to use
-# more intuitive names for the files, but I can perhaps do so in a later code cleanup.
-
-
-dusubs = "/home/pi/ioreth/ioreth/ioreth/dusubs"
-dusubslist = "/home/pi/ioreth/ioreth/ioreth/dusubslist"
-
-
-class BotAprsHandler:
-    def __init__(self, callsign, client):
-        #aprs_handler.Handler.__init__(self, callsign=callsign,
-        #                      path=client._cfg['aprs']['path'])
-        self._client = client
-
-    def on_aprs_message(self, source, addressee, text, origframe, msgid=None, via=None):
-        # X*>X*:}WT0F-4>APDR16,TCPIP*,qAC,T2ROMANIA::APRSFL   :Test{13
-        # WT0F-4->APRSFL (via X*): (13) Test :: X*>X*:}WT0F-4>APDR16,TCPIP*,qAC,T2ROMANIA::APRSFL   :Test{13
-        logger.info(f"{source}->{addressee} (via {via}): ({msgid}) {text} :: {origframe}")
-        """Handle an APRS message.
-
-        This may be a directed message, a bulletin, announce ... with or
-        without confirmation request, or maybe just trash. We will need to
-        look inside to know.
-        """
-
-        if addressee.strip().upper() != self.callsign.upper():
-            # This message was not sent for us.
-            return
-
-        # Remove the end of path char if given a 3rd party packet
-        if via:
-            via = via.replace('*', '')
-
-        if re.match(r"^(ack|rej)\d+", text):
-            # We don't ask for acks, but may receive them anyway. Spec says
-            # acks and rejs must be exactly "ackXXXX" and "rejXXXX", case
-            # sensitive, no spaces. Be a little conservative here and do
-            # not try to interpret anything else as control messages.
-            logger.info("Ignoring control message %s from %s", text, source)
-            return
-
-#        self.handle_aprs_msg_bot_query(source, text, origframe)
-        if msgid:
-            # APRS Protocol Reference 1.0.1 chapter 14 (page 72) says we can
-            # reject a message by sending a rejXXXXX instead of an ackXXXXX
-            # "If a station is unable to accept a message". Not sure if it is
-            # semantically correct to use this for an invalid query for a bot,
-            # so always acks.
-            logger.info("Sending ack to message %s from %s.", msgid, source)
-            self.send_aprs_msg(source.replace('*',''), "ack" + msgid, via)
-
-        self.handle_aprs_msg_bot_query(source, text, via, origframe)
-
-
 
 
 class ReplyBot:
@@ -142,6 +81,8 @@ class ReplyBot:
         #self.netlog = BotLog(f"{self.config['files']['netlog']}-{time.strftime('%Y%m%d')}")
         #self.netmsg = BotLog(f"{self.config['files']['netmsg']}")
 
+        # discover additional commands added to command_dir directory
+        self._extra_commands = dict()
         self.register_commands(self.config.get('bot', 'command_dir'))
 
 
@@ -208,7 +149,16 @@ class ReplyBot:
             base_file = os.path.basename(os.path.splitext(cmd_file)[0])
             try:
                 mod = import_module(base_file)
-                mod.register()
+                mod_info = mod.register(self.config)
+
+                if mod_info:
+                    if 'command' in mod_info:
+                        self._extra_commands[mod_info['command']] = mod
+                    if 'aliases' in mod_info:
+                        for aka in mod_info['aliases']:
+                            self._extra_commands[aka] = mod
+
+
             except Exception as e:
                 logger.error(e)
 
@@ -458,11 +408,11 @@ class ReplyBot:
             logger.info(f"{cmd.status_str=}")
             self.aprs.send_aprs_status(cmd.status_str)
 
-    def on_message(self, source, dest, text):
-        reply = self.process_internal_commands(source, dest, text)
+    def on_message(self, frame):
+        reply = self.process_internal_commands(frame)
 
         if not reply:
-            reply = self.process_commands(source, dest, text)
+            reply = self.process_commands(frame)
 
         if not reply:
             # send help message
@@ -470,7 +420,7 @@ class ReplyBot:
 
         return reply
 
-    def process_internal_commands(self, source: str, dest: str, text: str):
+    def process_internal_commands(self, frame):
         """We got an text message direct to us. Handle it as a bot query.
         TODO: Make this a generic thing.
 
@@ -478,12 +428,11 @@ class ReplyBot:
         text: message text.
         """
 
-        sourcetrunc = source.replace('*','')
-        parsed_text = text.lstrip().split(" ", 1)
-        cmd = parsed_text[0].rstrip().lower()
+        info = frame.info.lstrip().split(" ", 1)
+        cmd = info[0].rstrip().lower()
         args = ''
-        if len(parsed_text) == 2:
-            args = parsed_text[1]
+        if len(info) == 2:
+            args = info[1]
 
         timestrtxt = time.strftime("%m%d %H%MZ")
 
@@ -497,7 +446,7 @@ class ReplyBot:
         #     return
 
         if cmd == 'ping':
-            logger.info(f"Handling PING from {source}")
+            logger.info(f"Handling PING from {frame.source}")
             return timestrtxt + ":Pong! " + args
         elif cmd == 'test':
 #                  1234567890123456789012345678901234567890123456789012345678901234567
@@ -514,14 +463,30 @@ class ReplyBot:
         elif cmd == 'about':
             return "APRS bot by WT0F based on ioreth by N2RAC/DU2XXR."
         elif cmd == 'time':
-            return "Localtime is " + time.strftime("%Y-%m-%d %H:%M:%S %Z")
+            return f"Localtime is {time.strftime("%Y-%m-%d %H:%M:%S %Z")}"
         elif cmd in ('help', '?'):
-#                                            123456789012345678901234567890123456789012345678901234567890123       4567
-            self.send_aprs_msg(sourcetrunc, "CQ [space] msg to join net & send msg to all checked in today /" +timestrtxt)
-            self.send_aprs_msg(sourcetrunc, "NET [space] msg to checkin & join without notifying everyone /" +timestrtxt)
-            self.send_aprs_msg(sourcetrunc, "LAST/LAST10/LAST15 to retrieve 5/10/15 msgs. ?APRST for path /"+timestrtxt)
-            self.send_aprs_msg(sourcetrunc, "?APRSM for the last 10 direct msgs to you. U to leave the net /" +timestrtxt)
-            self.send_aprs_msg(sourcetrunc, "MINE for ur last net msgs. SEARCH [spc] phrase to find msgs /" +timestrtxt)
-            self.send_aprs_msg(sourcetrunc, "LIST to see today's checkins. https://aprsph.net for more info/"+timestrtxt)
+            help_text = [
+                'ABOUT: Send info about this bot',
+                'TIME: Send the current local time',
+                'PING: Ping the bot and receive back a pong'
+            ]
+
+            # gather help lines from commands
+            for (name, mod) in self._extra_commands.items():
+                if callable(mod.help):
+                    help_text.append(mod.help())
+            return help_text
 
         return None
+
+    def process_commands(self, frame):
+        info = frame.info.lstrip().split(" ", 1)
+        cmd = info[0].rstrip().lower()
+        args = ''
+        if len(info) == 2:
+            args = info[1]
+
+        if cmd in self._extra_commands:
+            mod = self._extra_commands[cmd]
+            return mod.invoke(frame)
+

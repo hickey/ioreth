@@ -54,10 +54,54 @@ class AprsClient:
             logger.warning(exc)
 
     def on_recv_frame(self, frame):
+        """ Handle an AX.25 frame and look for APRS data packets.
+        """
         logger.debug(f'({frame=})')
 
-        # TODO update how to move frame
-        self.handle_frame(frame)
+        if frame.info == b"":
+            # No data.
+            return
+
+        via = None
+        if frame.info[0] == ord(b"}"):
+            # Got a third-party APRS packet, check the payload.
+            # PP5ITT-10>APDW15,PP5JRS-15*,WIDE2-1:}PP5ITT-7>APDR15,TCPIP,PP5ITT-10*::PP5ITT-10:ping 00:01{17
+
+            # This is tricky: according to the APRS Protocol Reference 1.0.1,
+            # chapter 17, the path may be both in TNC-2 encoding or in AEA
+            # encoding. So these both are valid:
+            #
+            # S0URCE>DE5T,PA0TH,PA1TH:payload
+            # S0URCE>PA0TH>PA1TH>DE5T:payload
+            #
+            # We are only using the source and payload for now so no worries,
+            # but another parser will be needed if we want the path.
+            #
+            # Of course, I never saw one of these EAE paths in the wild.
+
+            frame.via = frame.source.to_string()
+            eae_path = frame.info[1:].split(b">", 1)
+            if len(eae_path) != 2:
+                logger.warning(
+                    "Discarding third party packet with no destination. %s",
+                    frame.to_aprs_string().decode("utf-8", errors="replace"),
+                )
+                return
+
+            # Source address should be a valid callsign+SSID.
+            frame.source = eae_path[0].decode("utf-8", errors="replace")
+            destpath_payload = eae_path[1].split(b":", 1)
+
+            if len(destpath_payload) != 2:
+                logger.warning(
+                    "Discarding third party packet with no payload. %s",
+                    frame.to_aprs_string().decode("utf-8", errors="replace"),
+                )
+                return
+
+            frame.info = destpath_payload[1]
+
+        self.on_aprs_packet(frame, frame)
 
     def enqueue_frame(self, frame):
         logger.info("AX.25 frame %d: %s", self._frame_cnt, frame.to_aprs_string())
@@ -108,60 +152,6 @@ class AprsClient:
         """
         return self.make_frame((">" + status).encode("utf-8"), via)
 
-
-    def handle_frame(self, frame):
-        """ Handle an AX.25 frame and looks for APRS data packets.
-        """
-        logger.debug(f'({frame=})')
-
-        if frame.info == b"":
-            # No data.
-            return
-
-        via = None
-        source = frame.source.to_string()
-        payload = frame.info
-
-        if payload[0] == ord(b"}"):
-            # Got a third-party APRS packet, check the payload.
-            # PP5ITT-10>APDW15,PP5JRS-15*,WIDE2-1:}PP5ITT-7>APDR15,TCPIP,PP5ITT-10*::PP5ITT-10:ping 00:01{17
-
-            # This is tricky: according to the APRS Protocol Reference 1.0.1,
-            # chapter 17, the path may be both in TNC-2 encoding or in AEA
-            # encoding. So these both are valid:
-            #
-            # S0URCE>DE5T,PA0TH,PA1TH:payload
-            # S0URCE>PA0TH>PA1TH>DE5T:payload
-            #
-            # We are only using the source and payload for now so no worries,
-            # but another parser will be needed if we want the path.
-            #
-            # Of course, I never saw one of these EAE paths in the wild.
-
-            via = source
-            src_rest = frame.info[1:].split(b">", 1)
-            if len(src_rest) != 2:
-                logger.debug(
-                    "Discarding third party packet with no destination. %s",
-                    frame.to_aprs_string().decode("utf-8", errors="replace"),
-                )
-                return
-
-            # Source address should be a valid callsign+SSID.
-            source = src_rest[0].decode("utf-8", errors="replace")
-            destpath_payload = src_rest[1].split(b":", 1)
-
-            if len(destpath_payload) != 2:
-                logger.debug(
-                    "Discarding third party packet with no payload. %s",
-                    frame.to_aprs_string().decode("utf-8", errors="replace"),
-                )
-                return
-
-            payload = destpath_payload[1]
-
-        self.on_aprs_packet(frame, source, payload, via)
-
     def send_aprs_msg(self, to_call, text, via=None):
         logger.debug(f"({to_call}, {text}, {via})")
         self.write_frame(self.make_aprs_msg(to_call, text, via=via))
@@ -170,7 +160,7 @@ class AprsClient:
         logger.debug(f"({status}, {via})")
         self.write_frame(self.make_aprs_status(status, via=via))
 
-    def on_aprs_packet(self, origframe, source, payload, via=None):
+    def on_aprs_packet(self, frame):
         """A APRS packet was received, possibly through a third-party forward.
 
         This code runs *after* the search for third-party packets. The
@@ -184,58 +174,58 @@ class AprsClient:
         via: None is not a third party packet; otherwise is the callsign of
              the forwarder (as a string).
         """
-        logger.debug(f'({origframe=}, {source=}, {payload=}, {via=})')
+        logger.debug(f'({frame=})')
 
-        if payload == b"":
-            self.on_aprs_empty(origframe, source, payload, via)
+        if frame.info == b"":
+            self.on_aprs_empty(frame)
             return
-        data_type = payload[0]
+        data_type = frame.info[0]
         if data_type == ord(b":"):
-            self.on_aprs_message(origframe, source, payload, via)
+            self.on_aprs_message(frame)
         elif data_type == ord(b">"):
-            self.on_aprs_status(origframe, source, payload, via)
+            self.on_aprs_status(frame)
         elif data_type == ord(b";"):
-            self.on_aprs_object(origframe, source, payload, via)
+            self.on_aprs_object(frame)
         elif data_type == ord(b")"):
-            self.on_aprs_item(origframe, source, payload, via)
+            self.on_aprs_item(frame)
         elif data_type == ord(b"?"):
-            self.on_aprs_query(origframe, source, payload, via)
+            self.on_aprs_query(frame)
         elif data_type == ord(b"<"):
-            self.on_aprs_capabilities(origframe, source, payload, via)
+            self.on_aprs_capabilities(frame)
         elif data_type == ord(b"!"):
-            self.on_aprs_position_wtr(origframe, source, payload, via)
+            self.on_aprs_position_wtr(frame)
         elif data_type == ord(b"@"):
-            self.on_aprs_position_ts_msg(origframe, source, payload, via)
+            self.on_aprs_position_ts_msg(frame)
         elif data_type == ord(b"="):
-            self.on_aprs_position_msg(origframe, source, payload, via)
+            self.on_aprs_position_msg(frame)
         elif data_type == ord(b"/"):
-            self.on_aprs_position_ts(origframe, source, payload, via)
+            self.on_aprs_position_ts(frame)
         elif data_type == ord(b"T"):
-            self.on_aprs_telemetry(origframe, source, payload, via)
+            self.on_aprs_telemetry(frame)
         elif data_type == ord(b"`"):
-            self.on_aprs_mic_e(origframe, source, payload, via)
+            self.on_aprs_mic_e(frame)
         elif data_type == ord(b"'"):
-            self.on_aprs_old_mic_e(origframe, source, payload, via)
+            self.on_aprs_old_mic_e(frame)
         else:
-            self.on_aprs_others(origframe, source, payload, via)
+            self.on_aprs_others(frame)
 
-    def on_aprs_empty(self, origframe, source, payload, via):
+    def on_aprs_empty(self, frame):
         """APRS empty packet (no payload). What can we do with this?! Just
         log the sending station as alive?
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_message(self, origframe, source, payload, via=None):
+    def on_aprs_message(self, frame=None):
         """Parse APRS message packet (data type: :)
 
         This may be a directed message, a bulletin, announce ... with or
         without confirmation request, or maybe just trash. We will need to
         look inside to know.
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
 
-        data_str = payload.decode("utf-8", errors="replace")
+        data_str = frame.info.decode("utf-8", errors="replace")
 
         addressee_text = data_str[1:].split(":", 1)
         if len(addressee_text) != 2:
@@ -249,51 +239,51 @@ class AprsClient:
             # This message is asking for an ack.
             msgid = text_msgid[1]
 
-            logger.info(f"Sending ack to message {msgid} from {source=}.")
-            self.send_aprs_msg(source.replace('*',''), "ack" + msgid, via)
+            logger.info(f"Sending ack to message {msgid} from {frame.source}.")
+            self.send_aprs_msg(frame.source.replace('*',''), "ack" + msgid, frame.via)
 
-        logger.info(f"Message from {source}:{text}")
-        response = self.handler.on_message(source, addressee, text)
+        logger.info(f"Message from {frame.source}:{text}")
+        response = self.handler.on_message(frame)
         logger.debug(f"{response=}")
 
         # response is allowed to come back as multiple messages
         if type(response) == list:
             for r in response:
-                self.send_aprs_msg(source, r, via)
+                self.send_aprs_msg(frame.source, r, frame.via)
         else:
-            self.send_aprs_msg(source, response, via)
+            self.send_aprs_msg(frame.source, response, frame.via)
 
-    def on_aprs_status(self, origframe, source, payload, via=None):
+    def on_aprs_status(self, frame=None):
         """APRS status packet (data type: >)
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_object(self, origframe, source, payload, via=None):
+    def on_aprs_object(self, frame=None):
         """Object packet (data type: ;)
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_item(self, origframe, source, payload, via=None):
+    def on_aprs_item(self, frame=None):
         """Object packet (data type: ))
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_query(self, origframe, source, payload, via=None):
+    def on_aprs_query(self, frame=None):
         """APRS query packet (data type: ?)
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_capabilities(self, origframe, source, payload, via=None):
+    def on_aprs_capabilities(self, frame=None):
         """Station capabilities packet (data type: <)
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_position_wtr(self, origframe, source, payload, via=None):
+    def on_aprs_position_wtr(self, frame=None):
         """Position without timestamp no APRS messaging, or Ultimeter
         2000 WX Station (data type: !)
 
@@ -304,53 +294,53 @@ class AprsClient:
         PP5JR-15>APNU3B,WIDE1-1,WIDE3-3:!2741.46S/04908.89W#PHG7460/REDE SUL APRS BOA VISTA RANCHO QUEIMADO SC
         PY5CTV-13>APTT4,PP5BAU-15*,PP5JRS-15*:! Weather Station ISS Davis Morro do Caratuva - PR
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_position_ts_msg(self, origframe, source, payload, via=None):
+    def on_aprs_position_ts_msg(self, frame=None):
         """Position with timestamp (with APRS messaging) (data type: @)
 
         eg.
         PP5JR-13>APRS,PP5JR-15*,PP5JRS-15*:@092248z2741.47S/04908.88W_098/011g014t057r000p000P000h60b07816.DsVP
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_position_msg(self, origframe, source, payload, via=None):
+    def on_aprs_position_msg(self, frame=None):
         """Position without timestamp with APRS messaging (data type: =)
 
         eg.
         PY5TJ-12>APBK,PY5CTV-13*,WIDE1*,PP5JRS-15*:=2532.12S/04914.18WkTelemetria: 14.6v 25*C 56% U. Rel
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_position_ts(self, origframe, source, payload, via=None):
+    def on_aprs_position_ts(self, frame=None):
         """Position with timestamp, no APRS messaging (data type: /)
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_telemetry(self, origframe, source, payload, via=None):
+    def on_aprs_telemetry(self, frame=None):
         """Telemetry packet (data type: T)
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_mic_e(self, origframe, source, payload, via=None):
+    def on_aprs_mic_e(self, frame=None):
         """APRS Mic-E packet, current (data type: `)
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_old_mic_e(self, origframe, source, payload, via=None):
+    def on_aprs_old_mic_e(self, frame=None):
         """APRS Mic-E packet, old (data type: ')
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
 
-    def on_aprs_others(self, origframe, source, payload, via=None):
+    def on_aprs_others(self, frame=None):
         """All other APRS data types (possibly unknown)
         """
-        logger.debug(f"({origframe=}, {source=}, {payload=}, {via=})")
+        logger.debug(f"({frame=})")
         pass
