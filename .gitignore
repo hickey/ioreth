@@ -2,5 +2,4 @@ __pycache__
 bin/
 lib/
 netlog*
-cq*
 pyvenv.cfg

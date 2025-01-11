@@ -49,6 +49,7 @@ logging.basicConfig()
 logger = logging.getLogger('iorethd.bot')
 
 from cronex import CronExpression
+from .ax25 import Frame
 from .tcp_kiss_client import TcpKissClient
 from .aprs_is_client import AprsIsClient
 from . import remotecmd
@@ -119,6 +120,7 @@ class ReplyBot:
 
             if conn_def['type'] == 'kiss':
                 conn = TcpKissClient(conn_def['host'], conn_def['port'])
+                conn.conn_name = conn_name
                 conn.setCallsign(conn_def['callsign'])
                 conn.setDestination(conn_def['destination'])
                 conn.setPath(conn_def['path'])
@@ -126,6 +128,7 @@ class ReplyBot:
                 conn.connect()
             elif conn_def['type'] == 'aprs-is':
                 conn = AprsIsClient(conn_def['host'], conn_def['port'])
+                conn.conn_name = conn_name
                 conn.setCallsign(conn_def['callsign'])
                 conn.setPasscode(conn_def['passcode'])
                 conn.setDestination(conn_def['destination'])
@@ -149,15 +152,10 @@ class ReplyBot:
             base_file = os.path.basename(os.path.splitext(cmd_file)[0])
             try:
                 mod = import_module(base_file)
-                mod_info = mod.register(self.config)
+                infos = mod.register(self.config)
 
-                if mod_info:
-                    if 'command' in mod_info:
-                        self._extra_commands[mod_info['command']] = mod
-                    if 'aliases' in mod_info:
-                        for aka in mod_info['aliases']:
-                            self._extra_commands[aka] = mod
-
+                for info in infos:
+                    self._extra_commands[info['command']] = info
 
             except Exception as e:
                 logger.error(e)
@@ -418,7 +416,13 @@ class ReplyBot:
             # send help message
             reply = "Message not understood, please send 'help' for info."
 
-        return reply
+        new_mesgs = [f for f in reply if type(f) == Frame]
+        for msg in new_mesgs:
+            # send the msg out the approriate connection
+            self._connections[msg.connection].write_frame(msg)
+
+        # return the replies to just the originating station
+        return [f for f in reply if type(f) == str]
 
     def process_internal_commands(self, frame):
         """We got an text message direct to us. Handle it as a bot query.
@@ -472,9 +476,9 @@ class ReplyBot:
             ]
 
             # gather help lines from commands
-            for (name, mod) in self._extra_commands.items():
-                if callable(mod.help):
-                    help_text.append(mod.help())
+            for name in self._extra_commands.keys():
+                if 'help' in self._extra_commands[name]
+                    help_text.append(self._extra_commands[name]['help'])
             return help_text
 
         return None
@@ -488,5 +492,5 @@ class ReplyBot:
 
         if cmd in self._extra_commands:
             mod = self._extra_commands[cmd]
-            return mod.invoke(frame, args)
+            return mod.invoke(frame, cmd, args)
 

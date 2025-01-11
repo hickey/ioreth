@@ -36,6 +36,7 @@ class AprsClient:
         self.path = None
         self.destination = None
         self.handler = None
+        self.conn_name = None
 
     def setDestination(self, dest: str):
         self.destination = dest
@@ -57,6 +58,10 @@ class AprsClient:
         """ Handle an AX.25 frame and look for APRS data packets.
         """
         logger.debug(f'({frame=})')
+
+        # set the connection name on the frame so it can be determined
+        # later on how to route replies
+        frame.connection = self.conn_name
 
         if frame.info == b"":
             # No data.

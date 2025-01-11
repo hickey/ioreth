@@ -187,6 +187,7 @@ class Frame:
         self.pid = pid
         self.info = info
         self.via = via
+        self.connection = None
 
     @staticmethod
     def from_kiss_bytes(fdata):
