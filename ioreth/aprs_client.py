@@ -106,7 +106,7 @@ class AprsClient:
 
             frame.info = destpath_payload[1]
 
-        self.on_aprs_packet(frame, frame)
+        self.on_aprs_packet(frame)
 
     def enqueue_frame(self, frame):
         logger.info("AX.25 frame %d: %s", self._frame_cnt, frame.to_aprs_string())
@@ -245,7 +245,8 @@ class AprsClient:
             msgid = text_msgid[1]
 
             logger.info(f"Sending ack to message {msgid} from {frame.source}.")
-            self.send_aprs_msg(frame.source.replace('*',''), "ack" + msgid, frame.via)
+            self.send_aprs_msg(frame.source.to_string().replace('*',''), "ack" + msgid, frame.via)
+            frame.info = text
 
         logger.info(f"Message from {frame.source}:{text}")
         response = self.handler.on_message(frame)
@@ -254,9 +255,10 @@ class AprsClient:
         # response is allowed to come back as multiple messages
         if type(response) == list:
             for r in response:
-                self.send_aprs_msg(frame.source, r, frame.via)
+                logger.debug(f'sending {response=}')
+                self.send_aprs_msg(str(frame.source), r, frame.via)
         else:
-            self.send_aprs_msg(frame.source, response, frame.via)
+            self.send_aprs_msg(str(frame.source), response, frame.via)
 
     def on_aprs_status(self, frame=None):
         """APRS status packet (data type: >)

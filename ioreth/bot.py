@@ -151,14 +151,21 @@ class ReplyBot:
         for cmd_file in glob(f"{cmd_dir}/*.py"):
             base_file = os.path.basename(os.path.splitext(cmd_file)[0])
             try:
+                logger.debug(f'Registering {base_file}')
                 mod = import_module(base_file)
+                if hasattr(mod, 'logger'):
+                    mod.logger.level = logger.level
                 infos = mod.register(self.config)
 
                 for info in infos:
+                    logger.info(f"Registered command: {info['command']}")
+                    info['module'] = mod
                     self._extra_commands[info['command']] = info
 
             except Exception as e:
                 logger.error(e)
+                if logger.level == logging.DEBUG:
+                    raise e
 
     def update_bulletins(self):
         logger.debug('()')
@@ -407,22 +414,27 @@ class ReplyBot:
             self.aprs.send_aprs_status(cmd.status_str)
 
     def on_message(self, frame):
+        logger.debug(f'({frame=})')
         reply = self.process_internal_commands(frame)
 
-        if not reply:
+        if reply is None:
             reply = self.process_commands(frame)
 
-        if not reply:
+        if reply is None:
             # send help message
             reply = "Message not understood, please send 'help' for info."
 
         new_mesgs = [f for f in reply if type(f) == Frame]
         for msg in new_mesgs:
             # send the msg out the approriate connection
-            self._connections[msg.connection].write_frame(msg)
+            logger.debug(f'sending to {msg.dest}: {msg.info}')
+            self._handlers[msg.connection].write_frame(msg)
 
         # return the replies to just the originating station
-        return [f for f in reply if type(f) == str]
+        if type(reply) == str:
+            return reply
+        else:
+            return [f for f in reply if type(f) == str]
 
     def process_internal_commands(self, frame):
         """We got an text message direct to us. Handle it as a bot query.
@@ -432,7 +444,7 @@ class ReplyBot:
         text: message text.
         """
 
-        info = frame.info.lstrip().split(" ", 1)
+        info = str(frame.info).lstrip().split(" ", 1)
         cmd = info[0].rstrip().lower()
         args = ''
         if len(info) == 2:
@@ -477,20 +489,20 @@ class ReplyBot:
 
             # gather help lines from commands
             for name in self._extra_commands.keys():
-                if 'help' in self._extra_commands[name]
+                if 'help' in self._extra_commands[name]:
                     help_text.append(self._extra_commands[name]['help'])
             return help_text
 
         return None
 
     def process_commands(self, frame):
-        info = frame.info.lstrip().split(" ", 1)
+        info = str(frame.info).lstrip().split(" ", 1)
         cmd = info[0].rstrip().lower()
         args = ''
         if len(info) == 2:
             args = info[1]
 
         if cmd in self._extra_commands:
-            mod = self._extra_commands[cmd]
-            return mod.invoke(frame, cmd, args)
+            info = self._extra_commands[cmd]
+            return info['module'].invoke(frame, cmd, args)
 
