@@ -444,7 +444,7 @@ class ReplyBot:
         text: message text.
         """
 
-        info = str(frame.info).lstrip().split(" ", 1)
+        info = frame.info.decode('ascii').lstrip().split(" ", 1)
         cmd = info[0].rstrip().lower()
         args = ''
         if len(info) == 2:
@@ -496,7 +496,7 @@ class ReplyBot:
         return None
 
     def process_commands(self, frame):
-        info = str(frame.info).lstrip().split(" ", 1)
+        info = frame.info.decode('ascii').lstrip().split(" ", 1)
         cmd = info[0].rstrip().lower()
         args = ''
         if len(info) == 2:

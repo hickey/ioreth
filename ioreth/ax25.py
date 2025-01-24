@@ -260,7 +260,7 @@ class Frame:
 
         # Headers must be ASCII. Otherwhise is an error.
         headers = lst[0].decode("ascii")
-        info = lst[1]
+        info = lst[1].decode("ascii")
 
         lst = headers.split(">", 1)
         if len(lst) != 2:
