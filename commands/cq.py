@@ -1,5 +1,6 @@
 
 import logging
+import time
 
 logging.basicConfig()
 logger = logging.getLogger('commands.cq')
@@ -40,7 +41,7 @@ class NetLog:
         entries = self.fp.readlines()
         for entry in entries:
             ci_time, ci_station, ci_mesg = entry.split('|', 2)
-            ci_mesg = ci.mesg.replace('\n', '')
+            ci_mesg = ci_mesg.replace('\n', '')
             self.checkins.append({'time': ci_time,
                                   'station': ci_station,
                                   'message': ci_mesg })
