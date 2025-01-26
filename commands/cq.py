@@ -89,28 +89,30 @@ def do_cq(frame, args):
 
     # iterate through the check ins and send a message
     notifications = [f"You are checked in as {frame.source}"]
+    recipients = []
+
     for checkin in netlog.checkins:
         receiver, conn = checkin['station'].split('/')
-        if receiver == str(frame.source):
-            # we don't need to send the source a notification
+        if (receiver == str(frame.source)) or (receiver in recipients):
+            # we don't need to send notification to the source
+            # or a station we have already sent to
             next
 
-        dest = Address.from_string(config[f'conn.{conn}']['destination'])
         bot_name = Address.from_string(config[f'conn.{conn}']['callsign'])
+        dest = Address.from_string(config[f'conn.{conn}']['destination'])
+        mesg = f':{receiver:9}:{frame.source}: {args}'.encode('ASCII')
         path = []
         for p in config[f'conn.{conn}']['path'].split(','):
             path.append(Address.from_string(p))
-        mesg = f':{receiver:9}:{frame.source}: {args}'.encode('ASCII')
 
         notif_frame = Frame(bot_name, dest, path, APRS_CONTROL_FLD,
                             APRS_PROTOCOL_ID, mesg)
         notif_frame.connection = conn
         notifications.append(notif_frame)
 
+        # add to list so we don't send duplicate messages
+        recipients.append(receiver)
     return notifications
-
-
-
 
 
 #         elif qry == "netremind" :
