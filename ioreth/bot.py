@@ -148,6 +148,7 @@ class ReplyBot:
         logger.debug(f"({cmd_dir})")
         sys.path.append(cmd_dir)
 
+        logger.info(f"Registering external commands from {cmd_dir}")
         for cmd_file in glob(f"{cmd_dir}/*.py"):
             base_file = os.path.basename(os.path.splitext(cmd_file)[0])
             try:
@@ -418,7 +419,7 @@ class ReplyBot:
         reply = self.process_internal_commands(frame)
 
         if reply is None:
-            reply = self.process_commands(frame)
+            reply = self.process_external_commands(frame)
 
         if reply is None:
             # send help message
@@ -427,7 +428,7 @@ class ReplyBot:
         new_mesgs = [f for f in reply if type(f) == Frame]
         for msg in new_mesgs:
             # send the msg out the approriate connection
-            logger.debug(f'sending to {msg.dest}: {msg.info}')
+            logger.info(f'sending to {msg.dest}: {msg.info}')
             self._handlers[msg.connection].write_frame(msg)
 
         # return the replies to just the originating station
@@ -444,12 +445,7 @@ class ReplyBot:
         text: message text.
         """
 
-        info = frame.info.decode('ascii').lstrip().split(" ", 1)
-        cmd = info[0].rstrip().lower()
-        args = ''
-        if len(info) == 2:
-            args = info[1]
-
+        addressee, cmd, args = self._unpack_message(frame)
         timestrtxt = time.strftime("%m%d %H%MZ")
 
         if '\x00' in args or '<0x' in args :
@@ -495,14 +491,26 @@ class ReplyBot:
 
         return None
 
-    def process_commands(self, frame):
-        info = frame.info.decode('ascii').lstrip().split(" ", 1)
-        cmd = info[0].rstrip().lower()
-        args = ''
-        if len(info) == 2:
-            args = info[1]
+    def process_external_commands(self, frame):
+        addressee, cmd, args = self._unpack_message(frame)
 
         if cmd in self._extra_commands:
             info = self._extra_commands[cmd]
             return info['module'].invoke(frame, cmd, args)
 
+    def _unpack_message(self, frame):
+        info = frame.info.decode('ascii').lstrip()
+
+        if info[0] == ':':
+            # standard APRS message
+            parts = info.split(':')
+            addressee = parts[1].strip()
+            text = re.split(r'\s+', parts[2].strip(), 1)
+            cmd = text[0].lower()
+            args = ''
+            if len(text) == 2
+                args = text[1]
+
+            return (addressee, cmd, args)
+
+        return (None, '', '')
