@@ -246,7 +246,7 @@ class AprsClient:
 
             logger.info(f"Sending ack to message {msgid} from {frame.source}.")
             self.send_aprs_msg(frame.source.to_string().replace('*',''), "ack" + msgid, frame.via)
-            frame.info = text.encode()
+            frame.info = f":{addressee:9}:{text}".encode()
 
         logger.info(f"Message from {frame.source}:{text}")
         response = self.handler.on_message(frame)
