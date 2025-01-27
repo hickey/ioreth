@@ -187,13 +187,13 @@ class Frame:
         )
 
     @staticmethod
-    def from_aprs_string(frame_str):
+    def from_aprs(raw_frame):
         """frame_str is a *bytes* object!  Rename this.
         """
         # PP5ITT-7>APDR15,PP5JRS-15*,WIDE2-2,qAR,PU5BRA-10:=2628.97S/04906.81Wx Ittner
 
         # Split the frame in headers and data
-        lst = frame_str.split(b":", 1)
+        lst = raw_frame.split(b":", 1)
         if len(lst) != 2:
             raise ValueError("Bad APRS frame string")
 
@@ -219,11 +219,8 @@ class Frame:
         logger.debug(f'{f=}')
         return f
 
-    def to_aprs_string(self):
-        """Convert the frame to a APRS string. Does not suport Mic-E yet.
-
-        The APRS string is actually a *byte* string, despite the lion's
-        share of the messages being ASCII-only.
+    def to_aprs(self):
+        """Convert the frame to a APRS byte array. Does not suport Mic-E yet.
         """
 
         via = ''
@@ -267,4 +264,4 @@ class Frame:
     #     return [Address.from_bytes(path[i : i + 7]) for i in range(0, len(path), 7)]
 
     def __repr__(self):
-        return f"<Frame={self.to_aprs_string().decode("utf-8", errors="replace")}>"
+        return f"<Frame={self.to_aprs().decode("utf-8", errors="replace")}>"

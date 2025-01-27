@@ -89,7 +89,7 @@ class AprsClient:
             if len(eae_path) != 2:
                 logger.warning(
                     "Discarding third party packet with no destination. %s",
-                    frame.to_aprs_string().decode("utf-8", errors="replace"),
+                    frame.to_aprs().decode("utf-8", errors="replace"),
                 )
                 return
 
@@ -100,7 +100,7 @@ class AprsClient:
             if len(destpath_payload) != 2:
                 logger.warning(
                     "Discarding third party packet with no payload. %s",
-                    frame.to_aprs_string().decode("utf-8", errors="replace"),
+                    frame.to_aprs().decode("utf-8", errors="replace"),
                 )
                 return
 
@@ -108,29 +108,29 @@ class AprsClient:
 
         self.on_aprs_packet(frame)
 
-    def enqueue_frame(self, frame):
-        logger.info("AX.25 frame %d: %s", self._frame_cnt, frame.to_aprs_string())
-        #self.enqueue_frame_bytes(frame.to_kiss_bytes())
-        self.enqueue_frame_bytes(frame.to_aprs_string())
+    # def enqueue_frame(self, frame):
+    #     logger.info("AX.25 frame %d: %s", self._frame_cnt, frame.to_aprs())
+    #     #self.enqueue_frame_bytes(frame.to_kiss_bytes())
+    #     self.enqueue_frame_bytes(frame.to_aprs())
 
-    def enqueue_frame_bytes(self, data_bytes):
-        logger.info("AX.25 frame %d enqueued for sending", self._frame_cnt)
-        self._snd_queue.append((self._frame_cnt, data_bytes))
-        self._frame_cnt += 1
+    # def enqueue_frame_bytes(self, data_bytes):
+    #     logger.info("AX.25 frame %d enqueued for sending", self._frame_cnt)
+    #     self._snd_queue.append((self._frame_cnt, data_bytes))
+    #     self._frame_cnt += 1
 
-    def dequeue_frame_bytes(self):
-        now = time.monotonic()
-        if now < (self._snd_queue_last + self._snd_queue_interval):
-            return
-        self._snd_queue_last = now
-        if len(self._snd_queue) > 0:
-            num, frame_bytes = self._snd_queue.pop(0)
-            logger.info("Sending queued AX.25 frame %d", num)
-            logger.info(frame_bytes)
-            self.send_frame_bytes(frame_bytes)
+    # def dequeue_frame_bytes(self):
+    #     now = time.monotonic()
+    #     if now < (self._snd_queue_last + self._snd_queue_interval):
+    #         return
+    #     self._snd_queue_last = now
+    #     if len(self._snd_queue) > 0:
+    #         num, frame_bytes = self._snd_queue.pop(0)
+    #         logger.info("Sending queued AX.25 frame %d", num)
+    #         logger.info(frame_bytes)
+    #         self.send_frame_bytes(frame_bytes)
 
-    def on_loop_hook(self):
-        self.dequeue_frame_bytes()
+    # def on_loop_hook(self):
+    #     self.dequeue_frame_bytes()
 
     def make_frame(self, data, via=None):
         """Shortcut for making a AX.25 frame with a APRS packet with the
