@@ -88,68 +88,6 @@ class AprsIsClient(AprsClient):
             if 'timed out' in str(e):
                 pass
 
-        # poller = select.poll()
-        # self._run = True
-
-        # will_disconnect = False
-        # fd = -1
-        # if self.is_connected():
-        #     fd = self._sock.fileno()
-        #     flags = select.POLLIN | select.POLLHUP | select.POLLERR
-        #     if len(self._outbuf) > 0:
-        #         flags |= select.POLLOUT
-        #     poller.register(fd, flags)
-
-        # # Look for incoming packets
-        # logger.debug('Start polling')
-        # events = poller.poll(1000)
-        # logger.debug('Finish polling')
-
-        # # Process each event
-        # for _, evt in events:
-        #     # error in socket connection
-        #     if evt & (select.POLLHUP | select.POLLERR):
-        #         logger.debug('Received disconnect event')
-        #         will_disconnect = True
-        #     # TODO handle POLLRDHUP
-
-        #     # incoming packet
-        #     if evt & select.POLLIN:
-        #         logger.debug('Received incoming packets')
-        #         rdata = self._sock.recv(2048)
-        #         if len(rdata) == 0:
-        #             will_disconnect = True
-        #         else:
-        #             self._inbuf += rdata
-
-        #     # socket can accept writes
-        #     if evt & select.POLLOUT:
-        #         logger.debug('Received output event')
-        #         nsent = self._sock.send(self._outbuf)
-        #         self._outbuf = self._outbuf[nsent:]
-
-        # if fd >= 0:
-        #     logger.debug('Unregister poller')
-        #     poller.unregister(fd)
-
-        # # process any packets received
-        # while len(self._inbuf) > 3:
-        #     logger.debug('Processing received packets')
-        #     # FEND, FDATA, escaped_data, FEND, ...
-        #     if self._inbuf[0] != ord(TcpKissClient.FEND):
-        #         logger.error('Bad frame start')
-        #         raise ValueError("Bad frame start")
-        #     lst = self._inbuf[2:].split(TcpKissClient.FEND, 1)
-        #     if len(lst) > 1:
-        #         self._inbuf = lst[1]
-        #         frame = (
-        #             lst[0]
-        #             .replace(TcpKissClient.FESC_TFEND, TcpKissClient.FEND)
-        #             .replace(TcpKissClient.FESC_TFESC, TcpKissClient.FESC)
-        #         )
-        #         logger.debug('Sending frame to APRS client')
-        #         self.on_recv(frame)
-
         # if will_disconnect:
         #     self.disconnect()
 
@@ -167,7 +105,7 @@ class AprsIsClient(AprsClient):
         if not self.is_connected():
             return
 
-        self._connection.sendall(frame.to_aprs())
+        self._connection.sendall(frame.to_string())
 
     def on_connect(self):
         logger.info("APRS-IS connection connected")
