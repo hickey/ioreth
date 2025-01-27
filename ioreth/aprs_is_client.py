@@ -74,7 +74,7 @@ class AprsIsClient(AprsClient):
     def on_recv(self, aprslib_frame):
         logger.debug(f'({aprslib_frame=})')
 
-        frame = Frame.from_aprs_string(aprslib_frame['raw'].encode('ASCII'))
+        frame = Frame.from_aprs(aprslib_frame['raw'].encode('ASCII'))
         self.on_recv_frame(frame)
 
     def on_loop_hook(self):
@@ -167,7 +167,7 @@ class AprsIsClient(AprsClient):
         if not self.is_connected():
             return
 
-        self._connection.sendall(frame.to_aprs_string().decode('utf-8'))
+        self._connection.sendall(frame.to_aprs())
 
     def on_connect(self):
         logger.info("APRS-IS connection connected")
