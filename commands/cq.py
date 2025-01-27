@@ -71,6 +71,7 @@ def register(bot_config):
             }]
 
 def invoke(frame, cmd: str, args: str):
+    logger.debug(f"({frame=}, {cmd=}, {args=})")
     if cmd == 'cq':
         return do_cq(frame, args)
 
@@ -78,6 +79,7 @@ def invoke(frame, cmd: str, args: str):
 
 
 def do_cq(frame, args):
+    logger.debug(f"({frame=}, {args=})")
     global config, netlog
 
     # need to do some dup checking on the checkin
