@@ -209,8 +209,8 @@ class Frame:
             if addr_list[-1].end_of_path:
                 break
 
-        source = addr_list[0]
-        path = addr_list[1:]
+        source = Address(addr_list[0])
+        path = [ Address(p) for p in addr_list[1:] ]
 
         if pos >= dlen - 2:
             raise ValueError("Invalid frame data: " + fdata.hex())
@@ -260,7 +260,7 @@ class Frame:
 
         # Headers must be ASCII. Otherwhise is an error.
         headers = lst[0].decode("ascii")
-        info = lst[1].decode("ascii")
+        info = lst[1]
 
         lst = headers.split(">", 1)
         if len(lst) != 2:
