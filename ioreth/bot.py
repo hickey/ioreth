@@ -508,7 +508,7 @@ class ReplyBot:
             text = re.split(r'\s+', parts[2].strip(), 1)
             cmd = text[0].lower()
             args = ''
-            if len(text) == 2
+            if len(text) == 2:
                 args = text[1]
 
             return (addressee, cmd, args)

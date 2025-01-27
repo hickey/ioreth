@@ -33,92 +33,6 @@ APRS_CONTROL_FLD = 0x03
 APRS_PROTOCOL_ID = 0xF0
 
 
-def pack_address(callsign, ssid=0, digipeated=False, end_of_path=False):
-    if ssid < 0 or ssid > 15:
-        raise ValueError("Bad SSID %d" % ssid)
-
-    if len(callsign) > 6:
-        raise ValueError("Callsign '%s' is too long" % callsign)
-
-    addr = [a << 1 for a in callsign.ljust(6).encode("ASCII")]
-
-    # Last byte format: h11sssse
-    #   h = Has been digipeated;
-    #   1 = Always one (reserved);
-    #   s = SSID bits;
-    #   e = End of repeater path.
-
-    lastb = 0b01100000 | (ssid << 1)
-    if digipeated:
-        lastb |= _ADDR_DIGIPEATED_BIT
-    if end_of_path:
-        lastb |= _ADDR_END_OF_PATH_BIT
-    addr.append(lastb)
-    return bytes(addr)
-
-
-def parse_address_string(addr_str):
-    """Parse an AX25 address string into its components.
-
-    The following formats are valid:
-
-        PP5ITT      -- Callsign with no SSID;
-        PP5ITT*     -- Digipeated callsign with no SSID;
-        PP5ITT-10   -- Callsign with SSID;
-        PP5ITT-10*  -- Digipeated callsign with SSID.
-    """
-    digipeated = False
-    ssid = 0
-    if addr_str[-1] == "*":
-        digipeated = True
-        addr_str = addr_str[:-1]
-    lst = addr_str.split("-", 1)
-    if len(lst) == 2:
-        ssid = int(lst[1])
-    return lst[0], ssid, digipeated
-
-
-def pack_address_string(addr_str, end_of_path=False):
-    """Pack an AX25 address string to a binary address.
-
-    The following formats are valid:
-
-        PP5ITT      -- Callsign with no SSID;
-        PP5ITT*     -- Digipeated callsign with no SSID;
-        PP5ITT-10   -- Callsign with SSID;
-        PP5ITT-10*  -- Digipeated callsign with SSID.
-    """
-
-    callsign, ssid, digipeated = parse_address_string(addr_str)
-    return pack_address(callsign, ssid, digipeated, end_of_path)
-
-
-def unpack_address(addr):
-    if len(addr) != 7:
-        raise ValueError("Bad AX25 address")
-
-    callsign = "".join(chr(n >> 1) for n in addr[0:6]).strip()
-    ssid = (addr[6] & 0b00011110) >> 1
-    digipeated = bool(addr[6] & _ADDR_DIGIPEATED_BIT)
-    end_of_path = bool(addr[6] & _ADDR_END_OF_PATH_BIT)
-
-    return callsign, ssid, digipeated, end_of_path
-
-
-def format_address_to_string(callsign, ssid, digipeated):
-    cs_pair = callsign
-    if ssid != 0:
-        cs_pair += "-%d" % (ssid)
-    if digipeated:
-        cs_pair += "*"
-    return cs_pair
-
-
-def unpack_address_to_string(addr):
-    callsign, ssid, digipeated, _ = unpack_address(addr)
-    return format_address_to_string(callsign, ssid, digipeated)
-
-
 class Address:
     def __init__(self, callsign, ssid=0, digipeated=False, end_of_path=False):
         self.callsign = callsign
@@ -128,58 +42,83 @@ class Address:
 
     @staticmethod
     def from_bytes(addr):
-        callsign, ssid, digipeated, end_of_path = unpack_address(addr)
+        if len(addr) != 7:
+            raise ValueError("Bad AX25 address")
+
+        callsign = "".join(chr(n >> 1) for n in addr[0:6]).strip()
+        ssid = (addr[6] & 0b00011110) >> 1
+        digipeated = bool(addr[6] & _ADDR_DIGIPEATED_BIT)
+        end_of_path = bool(addr[6] & _ADDR_END_OF_PATH_BIT)
+
         return Address(callsign, ssid, digipeated, end_of_path)
 
     @staticmethod
     def from_string(addr_str, end_of_path=False):
-        callsign, ssid, digipeated = parse_address_string(addr_str)
-        return Address(callsign, ssid, digipeated, end_of_path)
+        """Parse an AX25 address string into its components.
+
+        The following formats are valid:
+
+            PP5ITT      -- Callsign with no SSID;
+            PP5ITT*     -- Digipeated callsign with no SSID;
+            PP5ITT-10   -- Callsign with SSID;
+            PP5ITT-10*  -- Digipeated callsign with SSID.
+        """
+        digipeated = False
+        ssid = 0
+        if addr_str[-1] == "*":
+            digipeated = True
+            addr_str = addr_str[:-1]
+        lst = addr_str.split("-", 1)
+        if len(lst) == 2:
+            ssid = int(lst[1])
+        return Address(lst[0], ssid, digipeated, end_of_path)
 
     def to_bytes(self):
-        return pack_address(self.callsign, self.ssid, self.digipeated, self.end_of_path)
+        # TODO APRS-IS connections do allow other SSIDs
+        if self.ssid < 0 or self.ssid > 15:
+            raise ValueError("Bad SSID %d" % self.ssid)
+
+        # TODO check if APRS-IS allows longer callsigns
+        if len(self.callsign) > 6:
+            raise ValueError("Callsign '%s' is too long" % self.callsign)
+
+        addr = [a << 1 for a in self.callsign.ljust(6).encode("ASCII")]
+
+        # Last byte format: h11sssse
+        #   h = Has been digipeated;
+        #   1 = Always one (reserved);
+        #   s = SSID bits;
+        #   e = End of repeater path.
+
+        lastb = 0b01100000 | (self.ssid << 1)
+        if self.digipeated:
+            lastb |= _ADDR_DIGIPEATED_BIT
+        if self.end_of_path:
+            lastb |= _ADDR_END_OF_PATH_BIT
+        addr.append(lastb)
+        return bytes(addr)
 
     def to_string(self):
-        return format_address_to_string(self.callsign, self.ssid, self.digipeated)
+        cs_pair = self.callsign
+        if self.ssid != 0:
+            cs_pair += f"-{self.ssid}"
+        if self.digipeated:
+            cs_pair += "*"
+        return cs_pair
 
     def __bytes__(self):
         return self.to_bytes()
 
     def __repr__(self):
-        return self.to_string()
+        return f"<Address={self.to_string()}>"
 
     def __str__(self):
         return self.to_string()
 
 
-def pack_path(addr_strings):
-
-    return b"".join(
-        pack_address_string(a, False) for a in addr_strings[:-1]
-    ) + pack_address_string(addr_strings[-1], True)
-
-
-def unpack_path(path):
-
-    if len(path) % 7 != 0:
-        # It's an error: addresses are always 7 bytes long.
-        raise ValueError("Invalid path length")
-
-    return [unpack_address_to_string(path[i : i + 7]) for i in range(0, len(path), 7)]
-
-
-def unpack_path_to_addrs(path):
-
-    if len(path) % 7 != 0:
-        # It's an error: addresses are always 7 bytes long.
-        raise ValueError("Invalid path length")
-
-    return [Address.from_bytes(path[i : i + 7]) for i in range(0, len(path), 7)]
-
-
 class Frame:
     def __init__(self, source, dest, path, control, pid, info, via=None):
-        logger.debug(f"({source}, {dest}, {path}, {control}, {pid}, {info}, {via})")
+        logger.debug(f"({source=}, {dest=}, {path=}, {control=}, {pid=}, {info=}, {via=})")
         self.source = source
         self.dest = dest
         self.path = path
@@ -302,6 +241,30 @@ class Frame:
         buf = buf + b":" + self.info
 
         return buf
+
+    # def pack_path(addr_strings):
+    #
+    #     return b"".join(
+    #         Address.from_string(a, False).to_bytes() for a in addr_strings[:-1]
+    #     ) + Address.from_string(addr_strings[-1], True).to_bytes()
+    #
+    #
+    # def unpack_path(path):
+    #
+    #     if len(path) % 7 != 0:
+    #         # It's an error: addresses are always 7 bytes long.
+    #         raise ValueError("Invalid path length")
+    #
+    #     return [Address.from_string(path[i : i + 7]) for i in range(0, len(path), 7)]
+    #
+    #
+    # def unpack_path_to_addrs(path):
+    #
+    #     if len(path) % 7 != 0:
+    #         # It's an error: addresses are always 7 bytes long.
+    #         raise ValueError("Invalid path length")
+    #
+    #     return [Address.from_bytes(path[i : i + 7]) for i in range(0, len(path), 7)]
 
     def __repr__(self):
         return f"<Frame={self.to_aprs_string().decode("utf-8", errors="replace")}>"
