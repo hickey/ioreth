@@ -239,6 +239,26 @@ class Frame:
 
         return buf
 
+    def to_string(self):
+        """ Render frame as straight text for human consumption.
+            Does not suport Mic-E yet.
+        """
+        via = ''
+        if self.via:
+            via = f"{self.via}>{self.via}:}}"
+
+        buf = (
+            via
+            +self.source.to_string()
+            + ">"
+            + self.dest.to_string()
+        )
+        if len(self.path) > 0:
+            buf += "," + ",".join(a.to_string() for a in self.path)
+        buf = buf + ":" + self.info.decode('ascii')
+
+        return buf
+
     # def pack_path(addr_strings):
     #
     #     return b"".join(
@@ -264,4 +284,7 @@ class Frame:
     #     return [Address.from_bytes(path[i : i + 7]) for i in range(0, len(path), 7)]
 
     def __repr__(self):
-        return f"<Frame={self.to_aprs().decode("utf-8", errors="replace")}>"
+        return f"<Frame={self}>"
+
+    def __str__(self):
+        return self.to_string()
