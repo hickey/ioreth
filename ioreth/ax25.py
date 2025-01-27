@@ -229,12 +229,12 @@ class Frame:
 
         buf = (
             via.encode("ASCII")
-            +self.source.to_string().encode("ASCII")
+            +self.source.to_bytes()
             + b">"
-            + self.dest.to_string().encode("ASCII")
+            + self.dest.to_bytes()
         )
         if len(self.path) > 0:
-            buf += b"," + b",".join(a.to_string().encode("ASCII") for a in self.path)
+            buf += b"," + b",".join(a.to_bytes() for a in self.path)
         buf = buf + b":" + self.info
 
         return buf
