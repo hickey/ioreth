@@ -84,27 +84,40 @@ class AprsClient:
             #
             # Of course, I never saw one of these EAE paths in the wild.
 
-            frame.via = frame.source.to_string()
+            path = [ str(p) for p in frame.path ].join(',')
+            via = f"{frame.source}>{frame.dest}"
+            if path:
+                via += f",{path}"
+
             eae_path = frame.info[1:].split(b">", 1)
             if len(eae_path) != 2:
                 logger.warning(
                     "Discarding third party packet with no destination. %s",
-                    frame.to_aprs().decode("utf-8", errors="replace"),
+                    frame.to_string(),
                 )
                 return
 
             # Source address should be a valid callsign+SSID.
-            frame.source = eae_path[0].decode("utf-8", errors="replace")
-            destpath_payload = eae_path[1].split(b":", 1)
+            source = Address(eae_path[0])
+            destpath_info = eae_path[1].split(b":", 1)
+            destpath = destpath_info[0].split(b",")
+            dest = Address(destpath[0])
+            path = [ Address(p) for p in destpath[1:] ]
 
-            if len(destpath_payload) != 2:
+            if len(destpath_info) != 2:
                 logger.warning(
                     "Discarding third party packet with no payload. %s",
-                    frame.to_aprs().decode("utf-8", errors="replace"),
+                    frame.to_string(),
                 )
                 return
+            info = destpath_info[1]
 
-            frame.info = destpath_payload[1]
+            # rebuild the frame
+            frame.source = source
+            frame.dest = dest
+            frame.path = path
+            frame.info = info
+            frame.via = via
 
         self.on_aprs_packet(frame)
 
