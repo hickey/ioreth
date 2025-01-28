@@ -84,7 +84,7 @@ class AprsClient:
             #
             # Of course, I never saw one of these EAE paths in the wild.
 
-            path = [ str(p) for p in frame.path ].join(',')
+            path = ','.join([ str(p) for p in frame.path ])
             via = f"{frame.source}>{frame.dest}"
             if path:
                 via += f",{path}"
