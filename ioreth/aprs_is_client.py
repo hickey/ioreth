@@ -37,13 +37,9 @@ class AprsIsClient(AprsClient):
         self.port = int(port)
         self.filter = ''
         self._connection = None
-        self._inbuf = bytearray()
-        self._outbuf = bytearray()
 
-    def connect(self, timeout=10):
-        self._inbuf.clear()
-        self._outbuf.clear()
-
+    def connect(self):
+        self.timeout = timeout
         self._connection = aprslib.IS(self.callsign, passwd=self.passcode,
                                       host=self.addr, port=self.port)
         self._connection.set_filter(self.filter)
@@ -55,8 +51,6 @@ class AprsIsClient(AprsClient):
     def disconnect(self):
         if self._connection:
             self._connection.close()
-            self._inbuf.clear()
-            self._outbuf.clear()
             self.on_disconnect()
 
     def is_connected(self):
@@ -87,6 +81,9 @@ class AprsIsClient(AprsClient):
         except socket.error as e:
             if 'timed out' in str(e):
                 pass
+        except aprslib.exceptions.ConnectionDrop:
+            self.disconnect()
+            self.connect()
 
         # if will_disconnect:
         #     self.disconnect()
