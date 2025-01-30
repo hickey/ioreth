@@ -98,11 +98,11 @@ class AprsClient:
                 return
 
             # Source address should be a valid callsign+SSID.
-            source = Address(eae_path[0])
+            source = Address(eae_path[0].decode('ascii'))
             destpath_info = eae_path[1].split(b":", 1)
             destpath = destpath_info[0].split(b",")
-            dest = Address(destpath[0])
-            path = [ Address(p) for p in destpath[1:] ]
+            dest = Address(destpath[0].decode('ascii'))
+            path = [ Address(p.decode('ascii')) for p in destpath[1:] ]
 
             if len(destpath_info) != 2:
                 logger.warning(

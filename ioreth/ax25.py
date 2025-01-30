@@ -148,8 +148,8 @@ class Frame:
             if addr_list[-1].end_of_path:
                 break
 
-        source = addr_list[0]
-        path = [ p for p in addr_list[1:] ]
+        source = Address(addr_list[0])
+        path = [ Address(p) for p in addr_list[1:] ]
 
         if pos >= dlen - 2:
             raise ValueError("Invalid frame data: " + fdata.hex())
@@ -243,13 +243,10 @@ class Frame:
         """ Render frame as straight text for human consumption.
             Does not suport Mic-E yet.
         """
-        via = ''
-        if self.via:
-            via = f"{self.via}>{self.via}:}}"
 
         buf = (
-            via
-            +self.source.to_string()
+            self.via.decode('ascii')
+            + self.source.to_string()
             + ">"
             + self.dest.to_string()
         )
