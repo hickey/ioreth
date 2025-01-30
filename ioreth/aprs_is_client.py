@@ -39,7 +39,6 @@ class AprsIsClient(AprsClient):
         self._connection = None
 
     def connect(self):
-        self.timeout = timeout
         self._connection = aprslib.IS(self.callsign, passwd=self.passcode,
                                       host=self.addr, port=self.port)
         self._connection.set_filter(self.filter)
