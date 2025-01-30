@@ -8,5 +8,6 @@ def register(config):
             }]
 
 def invoke(frame, cmd: str, args: str):
-    return f"hello {frame.source}"
+    station = str(frame.source).replace('*', '')
+    return f"{cmd} {station}"
 

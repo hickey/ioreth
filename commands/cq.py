@@ -83,24 +83,25 @@ def do_cq(frame, args):
     global config, netlog
 
     # need to do some dup checking on the checkin
-    if netlog.check_for_dup(str(frame.source), args):
+    station = str(frame.source).replace('*', '')  # Checkin sent with no path
+    if netlog.check_for_dup(station, args):
         return ''
 
     # write another check in to netlog file
-    netlog.write(f"{frame.source}/{frame.connection}", args)
+    netlog.write(f"{station}/{frame.connection}", args)
 
     # iterate through the check ins and send a message
-    notifications = [f"You are checked in as {frame.source}"]
+    notifications = [f"You are checked in as {station}"]
     recipients = []
 
     for checkin in netlog.checkins:
         receiver, conn = checkin['station'].split('/')
-        if not((receiver == frame.source.decode('UTF-8')) or (receiver in recipients)):
+        if not((receiver == station) or (receiver in recipients)):
             # we don't need to send notification to the source
             # or a station we have already sent to
             bot_name = Address.from_string(config[f'conn.{conn}']['callsign'])
             dest = Address.from_string(config[f'conn.{conn}']['destination'])
-            mesg = f':{receiver:9}:{frame.source}: {args}'.encode('ASCII')
+            mesg = f':{receiver:9}:{station}: {args}'.encode('ASCII')
             path = []
             for p in config[f'conn.{conn}']['path'].split(','):
                 path.append(Address.from_string(p))
