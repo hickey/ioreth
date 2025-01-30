@@ -243,9 +243,13 @@ class Frame:
         """ Render frame as straight text for human consumption.
             Does not suport Mic-E yet.
         """
+        if self.via:
+            via = self.via.decode('ascii')
+        else:
+            via = ''
 
         buf = (
-            self.via.decode('ascii')
+            via
             + self.source.to_string()
             + ">"
             + self.dest.to_string()
