@@ -244,7 +244,7 @@ class Frame:
             Does not suport Mic-E yet.
         """
         if self.via:
-            via = self.via.decode('ascii')
+            via = self.via
         else:
             via = ''
 
@@ -256,7 +256,7 @@ class Frame:
         )
         if len(self.path) > 0:
             buf += "," + ",".join(a.to_string() for a in self.path)
-        buf = buf + ":" + self.info.decode('ascii')
+        buf = buf + ":" + self.info.decode('utf-8')
 
         return buf
 
