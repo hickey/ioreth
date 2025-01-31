@@ -148,8 +148,8 @@ class Frame:
             if addr_list[-1].end_of_path:
                 break
 
-        source = Address(addr_list[0])
-        path = [ Address(p) for p in addr_list[1:] ]
+        source = addr_list[0]
+        path = [ p for p in addr_list[1:] ]
 
         if pos >= dlen - 2:
             raise ValueError("Invalid frame data: " + fdata.hex())
