@@ -499,7 +499,7 @@ class ReplyBot:
             return info['module'].invoke(frame, cmd, args)
 
     def _unpack_message(self, frame):
-        info = frame.info.decode('utf-8').lstrip()
+        info = frame.info.decode('utf-8', errors='backslashreplace').lstrip()
 
         if info[0] == ':':
             # standard APRS message

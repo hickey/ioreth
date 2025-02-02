@@ -198,7 +198,7 @@ class Frame:
             raise ValueError("Bad APRS frame string")
 
         # Headers must be ASCII. Otherwhise is an error.
-        headers = lst[0].decode("ascii")
+        headers = lst[0].decode("ascii", errors='ignore')
         info = lst[1]
 
         lst = headers.split(">", 1)
@@ -256,7 +256,7 @@ class Frame:
         )
         if len(self.path) > 0:
             buf += "," + ",".join(a.to_string() for a in self.path)
-        buf = buf + ":" + self.info.decode('utf-8')
+        buf = buf + ":" + self.info.decode('utf-8', errors='backslashreplace')
 
         return buf
 
