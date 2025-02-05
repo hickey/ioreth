@@ -52,6 +52,7 @@ from cronex import CronExpression
 from .ax25 import Frame
 from .tcp_kiss_client import TcpKissClient
 from .aprs_is_client import AprsIsClient
+from .serial_client import SerialClient
 from . import remotecmd
 from . import utils
 from glob import glob
@@ -135,6 +136,14 @@ class ReplyBot:
                 conn.setPath(conn_def['path'])
                 if 'filter' in conn_def:
                     conn.setFilter(conn_def['filter'])
+                conn.setHandler(self)
+                conn.connect()
+            elif conn_def['type'] == 'serial':
+                conn = SerialClient(conn_def['device'], conn_def['speed'])
+                conn.conn_name = conn_name
+                conn.setCallsign(conn_def['callsign'])
+                conn.setDestination(conn_def['destination'])
+                conn.setPath(conn_def['path'])
                 conn.setHandler(self)
                 conn.connect()
             else:
