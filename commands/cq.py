@@ -73,6 +73,11 @@ def register(bot_config):
               'status': False,
               'help': 'NET: quietly join the net',
               'cron': '',
+            },
+            { 'command': 'list',
+              'status': False,
+              'help': 'LIST: respond with a list of net checkins',
+              'cron': '',
             }]
 
 def invoke(frame, cmd: str, args: str):
@@ -81,6 +86,9 @@ def invoke(frame, cmd: str, args: str):
         return do_cq(frame, args)
     elif cmd == 'net':
         return do_net(frame, args)
+    elif cmd == 'list':
+        return do_list(frame, args)
+
 
 
 
@@ -136,6 +144,29 @@ def do_net(frame, args):
     notifications = [f"You are checked in as {station}"]
 
     return notifications
+
+def do_list(frame, args):
+    logger.debug(f"({frame=}, {args=})")
+    global config, netlog
+
+    # gather a list of checkins and response with list of callsigns
+    responses = []
+    message = ''
+    for checkin in netlog.read():
+        if message:
+            message += ','
+        message += checkin['station']
+        if len(message) >= 60:
+            responses.push(message)
+            message = ''
+    responses.push(message)
+
+    return responses
+
+
+
+
+
 
 
 #         elif qry == "netremind" :
