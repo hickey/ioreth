@@ -68,12 +68,19 @@ def register(bot_config):
               'status': False,
               'help': 'CQ: msg to join net & send msg to all checked in today',
               'cron': '',
+            },
+            { 'command': 'net',
+              'status': False,
+              'help': 'NET: quietly join the net',
+              'cron': '',
             }]
 
 def invoke(frame, cmd: str, args: str):
     logger.debug(f"({frame=}, {cmd=}, {args=})")
     if cmd == 'cq':
         return do_cq(frame, args)
+    elif cmd == 'net':
+        return do_net(frame, args)
 
 
 
@@ -88,12 +95,10 @@ def do_cq(frame, args):
         return ''
 
     # write another check in to netlog file
-    netlog.write(f"{station}/{frame.connection}", args)
+    notifications = do_net(frame, args)
 
     # iterate through the check ins and send a message
-    notifications = [f"You are checked in as {station}"]
     recipients = []
-
     for checkin in netlog.checkins:
         receiver, conn = checkin['station'].split('/')
         if not((receiver == station) or (receiver in recipients)):
@@ -113,6 +118,23 @@ def do_cq(frame, args):
 
             # add to list so we don't send duplicate messages
             recipients.append(receiver)
+    return notifications
+
+def do_net(frame, args):
+    logger.debug(f"({frame=}, {args=})")
+    global config, netlog
+
+    # need to do some dup checking on the checkin
+    station = str(frame.source).replace('*', '')  # Checkin sent with no path
+    if netlog.check_for_dup(station, args):
+        return ''
+
+    # write another check in to netlog file
+    netlog.write(f"{station}/{frame.connection}", args)
+
+    # iterate through the check ins and send a message
+    notifications = [f"You are checked in as {station}"]
+
     return notifications
 
 
