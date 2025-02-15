@@ -149,26 +149,21 @@ def do_cq(frame, args):
     notifications = do_net(frame, args)
 
     # iterate through the check ins and send a message
-    recipients = []
-    for checkin in netlog.checkins:
-        receiver, conn = checkin['station'].split('/')
-        if not((receiver == station) or (receiver in recipients)):
-            # we don't need to send notification to the source
-            # or a station we have already sent to
-            bot_name = Address.from_string(config[f'conn.{conn}']['callsign'])
-            dest = Address.from_string(config[f'conn.{conn}']['destination'])
+    checkins = netlog.current_checkins()
+    for receiver, via in checkins.items():
+        # we don't need to send notification to the source
+        if not receiver == station:
+            bot_name = Address.from_string(config[f'conn.{via}']['callsign'])
+            dest = Address.from_string(config[f'conn.{via}']['destination'])
             mesg = f':{receiver:9}:{station}: {args}'.encode('ASCII')
             path = []
-            for p in config[f'conn.{conn}']['path'].split(','):
+            for p in config[f'conn.{via}']['path'].split(','):
                 path.append(Address.from_string(p))
 
             notif_frame = Frame(bot_name, dest, path, APRS_CONTROL_FLD,
                                 APRS_PROTOCOL_ID, mesg)
-            notif_frame.connection = conn
+            notif_frame.connection = via
             notifications.append(notif_frame)
-
-            # add to list so we don't send duplicate messages
-            recipients.append(receiver)
     return notifications
 
 def do_net(frame, args):
@@ -190,19 +185,21 @@ def do_net(frame, args):
 
 def do_list(frame, args):
     logger.debug(f"({frame=}, {args=})")
-    global config, netlog
+    global netlog
 
     # gather a list of checkins and response with list of callsigns
     responses = []
     message = ''
-    for checkin in netlog.read():
+    for checkin in netlog.current_checkins():
+        # add comma between callsigns
         if message:
             message += ','
-        message += checkin['station']
+        # Remove the connection information
+        message += checkin
         if len(message) >= 60:
-            responses.push(message)
+            responses.append(message)
             message = ''
-    responses.push(message)
+    responses.append(message)
 
     return responses
 
