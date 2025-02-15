@@ -11,7 +11,34 @@ netlog = None
 config = None
 
 class NetLog:
+    """
+    NetLog class keeps track of an active net and can provide statistics
+    about the net.
 
+    The net is recorded to a file named 'netlog-' with the net name
+    appended to it. This allows muliple nets to be operating at the same
+    time.
+
+    The format for the netlog file is as follows:
+
+        2025-02-06 10:48:57 EST|KB9LEB/tnc|73 FROM JACK IN NSB FL
+
+    There are three primary fields seperated by the pipe '|' symbol:
+    date time, station and message. The station is further divided into
+    callsign and connection name (here conn.tnc from the config file)
+    with a slash '/' separating the two values. If a station checks in
+    multiple times with different messages, then there will be mulitple
+    entries in the netlog file.
+
+    Internally the full netlog file is kept in memory as the `checkin`
+    attribute of the netlog instance. The `checkin` attribute is an
+    array of hash maps with the value of each field available. The keys
+    to the hash map are `time`, `station`, `via` and `message`.
+
+    When a station checks out of the net using the `unsubscribe` command,
+    a netlog entry is created with the message '*UNSUBSCRIBE*'.
+
+    """
     def __new__(cls, logfile=None):
         if not hasattr(cls, 'instance'):
             cls.instance = super(NetLog, cls).__new__(cls)
