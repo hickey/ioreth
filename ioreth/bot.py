@@ -162,6 +162,9 @@ class ReplyBot:
                     logger.info(f"Registered command: {info['command']}")
                     info['module'] = mod
                     self._extra_commands[info['command']] = info
+                    if 'alias' in info:
+                        for also in info['alias']:
+                            self._extra_commands[also] = info
 
             except Exception as e:
                 logger.error(e)
