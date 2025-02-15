@@ -121,6 +121,12 @@ def register(bot_config):
               'status': False,
               'help': 'LIST: respond with a list of net checkins',
               'cron': '',
+            },
+            { 'command': 'unsubscribe',
+              'status': False,
+              'help': 'UNSUBSCRIBE|UNSUB|U: check out of the net & stop checking notifications',
+              'cron': '',
+              'alias': ['u', 'unsub'],
             }]
 
 def invoke(frame, cmd: str, args: str):
@@ -131,9 +137,8 @@ def invoke(frame, cmd: str, args: str):
         return do_net(frame, args)
     elif cmd == 'list':
         return do_list(frame, args)
-
-
-
+    elif cmd in ['unsubscribe', 'unsub', 'u']:
+        return do_unsubscribe(frame, args)
 
 
 def do_cq(frame, args):
@@ -203,6 +208,15 @@ def do_list(frame, args):
 
     return responses
 
+
+def do_unsubscribe(frame, args):
+    logger.debug(f"({frame=}, {args=})")
+    global netlog
+
+    station = str(frame.source).replace('*', '')
+    netlog.write(f"{station}/{frame.connection}", '*UNSUBSCRIBE*')
+
+    return 'You have checked out of the net'
 
 
 
