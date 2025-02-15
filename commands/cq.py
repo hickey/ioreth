@@ -1,6 +1,7 @@
 
 import logging
 import time
+import re
 
 logging.basicConfig()
 logger = logging.getLogger('commands.cq')
@@ -67,10 +68,12 @@ class NetLog:
 
         entries = self.fp.readlines()
         for entry in entries:
-            ci_time, ci_station, ci_mesg = entry.split('|', 2)
+            ci_time, ci_source, ci_mesg = entry.split('|', 2)
+            ci_station, ci_via = ci_source.split('/', 2)
             ci_mesg = ci_mesg.replace('\n', '')
             self.checkins.append({'time': ci_time,
                                   'station': ci_station,
+                                  'via': ci_via,
                                   'message': ci_mesg })
         return self.checkins
 
@@ -79,6 +82,19 @@ class NetLog:
             if checkin['station'].startswith(sender) and mesg == str(checkin['message']):
                 return True
         return False
+
+    def current_checkins(self):
+        callsigns = {}
+        for entry in self.checkins:
+            if entry['station'] in callsigns and entry['message'] == '*UNSUBSCRIBE*':
+                del callsigns[entry['station']]
+                continue
+            callsigns[entry['station']] = entry['via']
+
+        return callsigns
+
+    def checkin_count(self):
+        return len(self.current_checkins())
 
 
 def register(bot_config):
