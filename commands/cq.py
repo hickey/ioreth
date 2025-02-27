@@ -54,12 +54,12 @@ class NetLog:
     def __del__(self):
         self.fp.close()
 
-    def write(self, sender: str, text: str):
+    def write(self, sender: str, connection: str, text: str):
         now = time.strftime("%Y-%m-%d %H:%M:%S %Z")
         self.fp.write(f"{now}|{sender}|{text}\n")
         self.fp.flush()
         self.checkins.append({'time': now, 'station': sender,
-                              'message': text})
+                              'message': text, 'via': connection})
 
     def read(self) -> str:
         self.checkins.clear()
@@ -181,7 +181,7 @@ def do_net(frame, args):
         return ''
 
     # write another check in to netlog file
-    netlog.write(f"{station}/{frame.connection}", args)
+    netlog.write(station, frame.connection, args)
 
     # iterate through the check ins and send a message
     notifications = [f"You are checked in as {station}"]
@@ -214,7 +214,7 @@ def do_unsubscribe(frame, args):
     global netlog
 
     station = str(frame.source).replace('*', '')
-    netlog.write(f"{station}/{frame.connection}", '*UNSUBSCRIBE*')
+    netlog.write(station, frame.connection, '*UNSUBSCRIBE*')
 
     return 'You have checked out of the net'
 
