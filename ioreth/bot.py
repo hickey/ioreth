@@ -162,6 +162,9 @@ class ReplyBot:
                     logger.info(f"Registered command: {info['command']}")
                     info['module'] = mod
                     self._extra_commands[info['command']] = info
+                    if 'alias' in info:
+                        for also in info['alias']:
+                            self._extra_commands[also] = info
 
             except Exception as e:
                 logger.error(e)
@@ -247,110 +250,6 @@ class ReplyBot:
                 for (name, conn) in self._handlers.items():
                     logger.info(f"Posting bulletin: {bln}='{text}' to {name}")
                     conn.send_aprs_msg(bln, text)
-
-
-# # These lines are for maintaining the net logs
-#         if os.path.isfile('/home/pi/ioreth/ioreth/ioreth/netlog'):
-#             file = open('/home/pi/ioreth/ioreth/ioreth/netlog', 'r')
-#             data20 = file.read()
-#             file.close()
-#             fout = open(filename1, 'a')
-#             fout.write(data20)
-#             fout.write(",")
-#             fout = open(filename3, 'a')
-#             fout.write(data20)
-#             fout.write("\n")
-#             logger.info("Copying latest checkin into day's net logs")
-#             os.remove('/home/pi/ioreth/ioreth/ioreth/netlog')
-#             logger.info("Deleting net log scratch file")
-#             timestrtxt = time.strftime("%m%d")
-#             file = open(filename1, 'r')
-#             data5 = file.read()
-#             file.close()
-#             if len(data5) > 310 :
-#                 listbody1 = data5[0:58]
-#                 listbody2 = data5[58:121]
-#                 listbody3 = data5[121:184]
-#                 listbody4 = data5[184:247]
-#                 listbody5 = data5[247:310]
-#                 listbody6 = data5[310:]
-#                 self.aprs.send_aprs_msg("BLN3NET", timestrtxt + " 1/6:" + listbody1)
-#                 self.aprs.send_aprs_msg("BLN4NET", "2/6:" + listbody2 )
-#                 self.aprs.send_aprs_msg("BLN5NET", "3/6:" + listbody3 )
-#                 self.aprs.send_aprs_msg("BLN6NET", "4/6:" + listbody4 )
-#                 self.aprs.send_aprs_msg("BLN7NET", "5/6:" + listbody5 )
-#                 self.aprs.send_aprs_msg("BLN8NET", "6/6:" + listbody6 )
-#             if len(data5) > 247 and len(data5) <= 310 :
-#                 listbody1 = data5[0:58]
-#                 listbody2 = data5[58:121]
-#                 listbody3 = data5[121:184]
-#                 listbody4 = data5[184:247]
-#                 listbody5 = data5[247:310]
-#                 self.aprs.send_aprs_msg("BLN4NET", timestrtxt + " 1/5:" + listbody1)
-#                 self.aprs.send_aprs_msg("BLN5NET", "2/5:" + listbody2 )
-#                 self.aprs.send_aprs_msg("BLN6NET", "3/5:" + listbody3 )
-#                 self.aprs.send_aprs_msg("BLN7NET", "4/5:" + listbody4 )
-#                 self.aprs.send_aprs_msg("BLN8NET", "5/5:" + listbody5 )
-#             if len(data5) > 184 and len(data5) <= 247 :
-#                 listbody1 = data5[0:58]
-#                 listbody2 = data5[58:121]
-#                 listbody3 = data5[121:184]
-#                 listbody4 = data5[184:]
-#                 self.aprs.send_aprs_msg("BLN5NET", timestrtxt + " 1/4:" + listbody1)
-#                 self.aprs.send_aprs_msg("BLN6NET", "2/4:" + listbody2 )
-#                 self.aprs.send_aprs_msg("BLN7NET", "3/4:" + listbody3 )
-#                 self.aprs.send_aprs_msg("BLN8NET", "4/4:" + listbody4 )
-#             if len(data5) > 121 and len(data5) <= 184:
-#                 listbody1 = data5[0:58]
-#                 listbody2 = data5[58:121]
-#                 listbody3 = data5[121:]
-#                 self.aprs.send_aprs_msg("BLN6NET", timestrtxt + " 1/3:" + listbody1)
-#                 self.aprs.send_aprs_msg("BLN7NET", "2/3:" + listbody2 )
-#                 self.aprs.send_aprs_msg("BLN8NET", "3/3:" + listbody3 )
-#             if len(data5) > 58 and len(data5) <= 121:
-#                 listbody1 = data5[0:58]
-#                 listbody2 = data5[58:]
-#                 self.aprs.send_aprs_msg("BLN6NET", timestrtxt + " 1/2:" + listbody1)
-#                 self.aprs.send_aprs_msg("BLN7NET", "2/2:" + listbody2 )
-#             if len(data5) <= 58:
-#                 self.aprs.send_aprs_msg("BLN6NET", timestrtxt + ":" + data5)
-#             self.aprs.send_aprs_msg("BLN9NET", "Full logs and more info at https://aprsph.net")
-#             logger.info("Sending new log text to BLN7NET to BLN8NET after copying over to daily log")
-
-#         if os.path.isfile('/home/pi/ioreth/ioreth/ioreth/nettext'):
-# #           file = open('/home/pi/ioreth/ioreth/ioreth/nettext', 'r')
-# #           data4 = file.read()
-# #           file.close()
-# # Deprecated the lines below. We are now writing the login text directly, since the previous method resulted in
-# # Simultaneous checkins not being logged properly. The purpose now is to use the nettext file as a flag whether to
-# # upload the net logs to the web.
-# #           fout = open('/home/pi/ioreth/ioreth/ioreth/netlog-msg', 'a')
-# #           fout.write(data4)
-# #           fout.write("\n")
-# #           fout.close()
-# #           logger.info("Copying latest checkin message into cumulative net log")
-#             os.remove('/home/pi/ioreth/ioreth/ioreth/nettext')
-#             logger.info("Deleting net text scratch file")
-#             cmd = 'scp -P 2202 /home/pi/ioreth/ioreth/ioreth/netlog-msg root@irisusers.com:/var/www/html/index.html'
-# #           cmd = 'scp /home/pi/ioreth/ioreth/ioreth/netlog-msg root@radio1.dx1arm.net:/var/www/aprsph.net/public_html/index.html'
-# #           cmd = 'scp /home/pi/ioreth/ioreth/ioreth/netlog-msg root@radio1.dx1arm.net:/var/www/html/aprsnet'
-#             try:
-#                 os.system(cmd)
-#                 logger.info("Uploading logfile to the web")
-#             except:
-#                 logger.info("ERRIR in uploading logfile to the web")
-
-#         if os.path.isfile('/home/pi/ioreth/ioreth/ioreth/aprsthursdaytext'):
-#             os.remove('/home/pi/ioreth/ioreth/ioreth/aprsthursdaytext')
-#             logger.info("Deleting aprsthursday net text scratch file")
-#             cmd = 'scp -P 2202 /home/pi/ioreth/ioreth/ioreth/aprsthursday/index.html root@irisusers.com:/var/www/html/aprsthursday/index.html'
-# #           cmd = 'scp /home/pi/ioreth/ioreth/ioreth/aprsthursday/index.html root@radio1.dx1arm.net:/var/www/aprsph.net/public_html/aprsthursday/index.html'
-# #           cmd = 'scp /home/pi/ioreth/ioreth/ioreth/netlog-msg root@radio1.dx1arm.net:/var/www/html/aprsnet'
-#             try:
-#                 os.system(cmd)
-#                 logger.info("Uploading aprsthursday logfile to the web")
-#             except:
-#                 logger.info("ERRIR in uploading logfile to the web")
 
     def update_status(self):
         logger.debug('()')
