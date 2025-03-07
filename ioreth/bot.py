@@ -68,8 +68,10 @@ class ReplyBot:
         self.config.optionxform = str # config values are case sensitive
         self.check_updated_config()
 
-        # c = TcpKissClient(self._cfg.get('tnc', 'addr'), self._cfg.getint('tnc', 'port'))
-        # c.setHandler(self)
+        # enable Sentry error capturing if DSN is specified
+        if self.config.get('bot', 'sentry_dsn'):
+            import sentry_sdk
+            sentry_sdk.init(dsn=self.config.get('bot', 'sentry_dsn'))
 
         #self.aprs = BotAprsHandler(self._cfg.get('aprs', 'callsign'), self)
         self._last_blns = time.monotonic()
