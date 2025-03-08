@@ -169,7 +169,8 @@ class ReplyBot:
                             self._extra_commands[also] = info
 
             except Exception as e:
-                logger.error(e)
+                logger.error(f"Exception when registering {info['command']}")
+                logger.exception(e)
                 if logger.level == logging.DEBUG:
                     raise e
 
