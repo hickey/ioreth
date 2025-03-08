@@ -1,0 +1,11 @@
+[Unit]
+Description=APRS Bot Service
+After=network.target
+
+[Service]
+ExecStart=/home/pi/ioreth/bin/python iorethd -c aprsbot.conf
+WorkingDirectory=/home/pi/ioreth
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
